@@ -140,21 +140,29 @@ export class TraceProcessor {
    */
   private async processTrace(trace: any): Promise<boolean> {
     try {
-      // Extract document_id from metadata
+      // Extract document_id and filename from metadata
       const documentId = trace.metadata?.document_id;
+      const filename = trace.metadata?.filename;
 
-      if (!documentId) {
-        logger.debug(`Trace ${trace.id} has no document_id in metadata, skipping`);
+      if (!documentId && !filename) {
+        logger.debug(`Trace ${trace.id} has no document_id or filename in metadata, skipping`);
         return false;
       }
 
-      logger.debug(`Processing trace ${trace.id} for document ${documentId}`);
+      logger.debug(`Processing trace ${trace.id} for document ${documentId} / filename ${filename}`);
 
-      // Get ground truth for this document
-      const groundTruth = await this.groundTruthService.getGroundTruth(documentId);
+      // Try to get ground truth - first by document_id, then by filename
+      let groundTruth = documentId
+        ? await this.groundTruthService.getGroundTruth(documentId)
+        : null;
+
+      if (!groundTruth && filename) {
+        logger.debug(`No ground truth found for document_id ${documentId}, trying filename ${filename}`);
+        groundTruth = await this.groundTruthService.getGroundTruth(filename);
+      }
 
       if (!groundTruth) {
-        logger.debug(`No ground truth found for document ${documentId}, skipping`);
+        logger.debug(`No ground truth found for document ${documentId} or filename ${filename}, skipping`);
         return false;
       }
 
