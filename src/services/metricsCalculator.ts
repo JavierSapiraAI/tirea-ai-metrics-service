@@ -215,8 +215,11 @@ export class MetricsCalculator {
         : [];
 
       // Extract consultas (from continuidad_asistencial.consultas)
+      // Consultas can be objects with 'texto' field or plain strings
       const consultas = Array.isArray(data.continuidad_asistencial?.consultas)
         ? data.continuidad_asistencial.consultas
+            .map((c: any) => typeof c === 'object' && c.texto ? c.texto : c)
+            .filter((t: any) => typeof t === 'string' && t !== '')
         : [];
 
       logger.debug('Transformed Tirea format', {
