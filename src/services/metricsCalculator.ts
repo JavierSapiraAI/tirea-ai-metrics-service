@@ -101,8 +101,26 @@ export class MetricsCalculator {
       });
 
       return metrics;
-    } catch (error) {
-      logger.error(`Failed to calculate metrics for document: ${extraction.document_id}`, { error });
+    } catch (error: any) {
+      logger.error(`Failed to calculate metrics for document: ${extraction.document_id}`, {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+        extraction: {
+          diagnostico: extraction.diagnostico,
+          cie10: extraction.cie10,
+          destino_alta: extraction.destino_alta,
+          medicamentos: extraction.medicamentos?.slice(0, 2), // First 2 items for debugging
+          consultas: extraction.consultas
+        },
+        groundTruth: {
+          diagnostico: groundTruth.diagnostico,
+          cie10: groundTruth.cie10,
+          destino_alta: groundTruth.destino_alta,
+          medicamentos: groundTruth.medicamentos?.slice(0, 2),
+          consultas: groundTruth.consultas
+        }
+      });
       throw error;
     }
   }
