@@ -122,7 +122,7 @@ export class LangfuseClient {
         }
       );
 
-      const trace = await response.json();
+      const trace = await response.json() as any;
       const observations = trace.observations || [];
 
       // Find the GENERATION observation with output
