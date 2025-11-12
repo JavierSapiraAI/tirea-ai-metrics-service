@@ -140,6 +140,12 @@ export class MetricsCalculator {
         }
       }
 
+      // Handle Tirea backend format (diagnosticos, destino_alta as object, continuidad_asistencial)
+      if (extractedData.diagnosticos || extractedData.continuidad_asistencial) {
+        return this.transformTireaFormat(extractedData);
+      }
+
+      // Handle legacy/direct format
       // Validate required fields
       const requiredFields = ['diagnostico', 'cie10', 'destino_alta', 'medicamentos', 'consultas'];
       for (const field of requiredFields) {
@@ -159,6 +165,60 @@ export class MetricsCalculator {
       };
     } catch (error) {
       logger.error('Failed to extract data from trace', { error });
+      return null;
+    }
+  }
+
+  /**
+   * Transform Tirea backend format to metrics format
+   */
+  private transformTireaFormat(data: any): AIExtraction | null {
+    try {
+      // Extract diagnosticos text (from texto_original field)
+      const diagnostico = Array.isArray(data.diagnosticos)
+        ? data.diagnosticos.map((d: any) => d.texto_original || d).filter((t: any) => typeof t === 'string')
+        : [];
+
+      // Extract CIE-10 codes (from codigo_cie10 or codigo_cie10_sugerido)
+      const cie10 = Array.isArray(data.diagnosticos)
+        ? data.diagnosticos
+            .map((d: any) => d.codigo_cie10 || d.codigo_cie10_sugerido)
+            .filter((c: any) => c && c !== null)
+        : [];
+
+      // Extract destino_alta (from tipo field if object, otherwise as-is)
+      const destino_alta = typeof data.destino_alta === 'object'
+        ? data.destino_alta.tipo || ''
+        : data.destino_alta || '';
+
+      // Extract medicamentos (from medicacion_continuada)
+      const medicamentos = Array.isArray(data.continuidad_asistencial?.medicacion_continuada)
+        ? data.continuidad_asistencial.medicacion_continuada
+        : [];
+
+      // Extract consultas (from continuidad_asistencial.consultas)
+      const consultas = Array.isArray(data.continuidad_asistencial?.consultas)
+        ? data.continuidad_asistencial.consultas
+        : [];
+
+      logger.debug('Transformed Tirea format', {
+        diagnostico_count: diagnostico.length,
+        cie10_count: cie10.length,
+        destino_alta,
+        medicamentos_count: medicamentos.length,
+        consultas_count: consultas.length,
+      });
+
+      return {
+        document_id: data.document_id || '',
+        diagnostico,
+        cie10,
+        destino_alta,
+        medicamentos,
+        consultas,
+      };
+    } catch (error) {
+      logger.error('Failed to transform Tirea format', { error });
       return null;
     }
   }
