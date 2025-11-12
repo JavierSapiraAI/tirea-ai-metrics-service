@@ -10,39 +10,12 @@ export interface F1ScoreResult {
 }
 
 /**
- * Safely converts array items to strings, filtering out invalid values
- */
-function toStringArray(arr: any[]): string[] {
-  return arr
-    .filter(item => item != null) // Remove null/undefined
-    .map(item => {
-      if (typeof item === 'string') {
-        return item;
-      }
-      if (typeof item === 'object') {
-        return JSON.stringify(item);
-      }
-      return String(item);
-    })
-    .map(s => s.toLowerCase().trim())
-    .filter(s => s.length > 0); // Remove empty strings
-}
-
-/**
  * Calculate F1 score with exact matching
  */
 export function calculateExactF1(predicted: string[], groundTruth: string[]): F1ScoreResult {
-  // Defensive type validation
-  if (!Array.isArray(predicted)) {
-    throw new TypeError(`calculateExactF1: predicted must be an array, got ${typeof predicted}: ${JSON.stringify(predicted).substring(0, 200)}`);
-  }
-  if (!Array.isArray(groundTruth)) {
-    throw new TypeError(`calculateExactF1: groundTruth must be an array, got ${typeof groundTruth}: ${JSON.stringify(groundTruth).substring(0, 200)}`);
-  }
-
   // Normalize strings for comparison (lowercase, trim)
-  const normalizedPredicted = toStringArray(predicted);
-  const normalizedGroundTruth = toStringArray(groundTruth);
+  const normalizedPredicted = predicted.map(s => s.toLowerCase().trim());
+  const normalizedGroundTruth = groundTruth.map(s => s.toLowerCase().trim());
 
   // Calculate true positives (exact matches)
   const truePositives = normalizedPredicted.filter(p =>
@@ -60,17 +33,9 @@ export function calculateExactF1(predicted: string[], groundTruth: string[]): F1
  * Uses string similarity with a threshold of 0.8 (80% similarity)
  */
 export function calculateSoftF1(predicted: string[], groundTruth: string[], threshold: number = 0.8): F1ScoreResult {
-  // Defensive type validation
-  if (!Array.isArray(predicted)) {
-    throw new TypeError(`calculateSoftF1: predicted must be an array, got ${typeof predicted}: ${JSON.stringify(predicted).substring(0, 200)}`);
-  }
-  if (!Array.isArray(groundTruth)) {
-    throw new TypeError(`calculateSoftF1: groundTruth must be an array, got ${typeof groundTruth}: ${JSON.stringify(groundTruth).substring(0, 200)}`);
-  }
-
   // Normalize strings
-  const normalizedPredicted = toStringArray(predicted);
-  const normalizedGroundTruth = toStringArray(groundTruth);
+  const normalizedPredicted = predicted.map(s => s.toLowerCase().trim());
+  const normalizedGroundTruth = groundTruth.map(s => s.toLowerCase().trim());
 
   let truePositives = 0;
   const matchedGroundTruth = new Set<number>();

@@ -1,7 +1,6 @@
 import { GroundTruthService } from './groundTruthService';
 import { MetricsCalculator } from './metricsCalculator';
 import { LangfuseClient } from './langfuseClient';
-import { CloudWatchMetricsService } from './cloudwatchMetrics';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('TraceProcessor');
@@ -10,7 +9,6 @@ export class TraceProcessor {
   private groundTruthService: GroundTruthService;
   private metricsCalculator: MetricsCalculator;
   private langfuseClient: LangfuseClient;
-  private cloudwatchMetrics: CloudWatchMetricsService;
   private pollInterval: number;
   private maxTracesPerPoll: number;
   private isRunning: boolean = false;
@@ -20,7 +18,6 @@ export class TraceProcessor {
     this.groundTruthService = new GroundTruthService();
     this.metricsCalculator = new MetricsCalculator();
     this.langfuseClient = new LangfuseClient();
-    this.cloudwatchMetrics = new CloudWatchMetricsService();
     this.pollInterval = parseInt(process.env.POLL_INTERVAL || '60000', 10); // 60 seconds
     this.maxTracesPerPoll = parseInt(process.env.MAX_TRACES_PER_POLL || '100', 10);
 
@@ -133,17 +130,6 @@ export class TraceProcessor {
         errors: errorCount,
         durationMs: duration,
       });
-
-      // Publish metrics to CloudWatch
-      await this.cloudwatchMetrics.publishBatchMetrics({
-        total: traces.length,
-        success: successCount,
-        skipped: skipCount,
-        errors: errorCount,
-        durationMs: duration,
-        groundTruthDocuments: cacheStats.size,
-        groundTruthCacheAge: cacheStats.ageMs ? Math.floor(cacheStats.ageMs / 1000) : undefined,
-      });
     } catch (error) {
       logger.error('Batch processing failed', { error });
     }
@@ -173,26 +159,7 @@ export class TraceProcessor {
       }
 
       // Extract AI extraction data from trace output
-      let traceOutput = trace.output;
-
-      // If trace.output is null, fetch observations to get the generation output
-      if (!traceOutput) {
-        logger.debug(`Trace ${trace.id} has no direct output, fetching observations...`);
-        const observations = await this.langfuseClient.getTraceObservations(trace.id);
-
-        // Find the first GENERATION type observation
-        const generationObs = observations.find((obs: any) => obs.type === 'GENERATION');
-
-        if (generationObs && generationObs.output) {
-          traceOutput = generationObs.output;
-          logger.debug(`Found output in generation observation for trace ${trace.id}`);
-        } else {
-          logger.warn(`No generation observation with output found for trace ${trace.id}, skipping`);
-          return false;
-        }
-      }
-
-      const extraction = this.metricsCalculator.extractDataFromTrace(traceOutput);
+      const extraction = this.metricsCalculator.extractDataFromTrace(trace.output);
 
       if (!extraction) {
         logger.warn(`Failed to extract data from trace ${trace.id}, skipping`);

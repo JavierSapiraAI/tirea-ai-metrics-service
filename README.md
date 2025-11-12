@@ -97,6 +97,58 @@ npm run build
 
 ## Deployment
 
+### Automated Deployment (Recommended)
+
+The metrics service uses GitHub Actions for continuous deployment to AWS EKS.
+
+#### Quick Start
+
+1. **Ensure prerequisites are met:**
+   - IAM roles created (via Terraform in `/terraform`)
+   - GitHub repository configured
+   - Kubernetes serviceaccount updated with IAM role ARN
+
+2. **Deploy by pushing to main branch:**
+   ```bash
+   git push origin main
+   ```
+
+3. **Or trigger manual deployment:**
+   - Go to GitHub Actions → CI/CD - Metrics Service → Run workflow
+   - Select environment (dev/stage/prod)
+   - Click "Run workflow"
+
+4. **Monitor deployment:**
+   - Check GitHub Actions tab for progress
+   - View logs: `kubectl logs -n langfuse -l app=metrics-service -f`
+
+For detailed setup instructions, see [GITHUB_SETUP.md](./GITHUB_SETUP.md)
+
+#### CI/CD Pipeline Stages
+
+1. **Build and Test**: Lints, tests, and builds Docker image
+2. **Push to ECR**: Pushes image to Amazon ECR (OIDC authentication)
+3. **Deploy to EKS**: Updates Kubernetes deployment, verifies health
+
+#### Infrastructure as Code
+
+AWS infrastructure is managed with Terraform:
+
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+See [terraform/README.md](./terraform/README.md) for details.
+
+---
+
+### Manual Deployment (Legacy)
+
+For manual deployment without CI/CD:
+
 ### 1. Build Docker Image
 
 ```bash

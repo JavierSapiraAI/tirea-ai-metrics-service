@@ -42,8 +42,9 @@ export function createApp(traceProcessor: TraceProcessor) {
     const stats = traceProcessor.getStats();
     const cacheStats = stats.cacheStats;
 
-    // Service is ready if processor is running and cache is loaded
-    const isReady = stats.isRunning && cacheStats.size > 0;
+    // Service is ready if processor is running
+    // Cache can be empty if no ground truth data is available
+    const isReady = stats.isRunning;
 
     const readiness = {
       ready: isReady,
@@ -51,6 +52,7 @@ export function createApp(traceProcessor: TraceProcessor) {
       checks: {
         processorRunning: stats.isRunning,
         cacheLoaded: cacheStats.size > 0,
+        cacheSize: cacheStats.size,
       },
     };
 

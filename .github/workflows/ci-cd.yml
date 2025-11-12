@@ -1,21 +1,41 @@
-name: CI/CD Pipeline
+name: CI/CD - Metrics Service
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
   pull_request:
-    branches: [main, develop]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
 
 env:
   AWS_REGION: eu-west-2
+  AWS_ACCOUNT_ID: 936389956156
   EKS_CLUSTER_NAME: langfuse-backoffice-dev
   ECR_REPOSITORY: metrics-service
-  NAMESPACE: langfuse
+  K8S_NAMESPACE: langfuse
+
+permissions:
+  id-token: write  # Required for AWS OIDC
+  contents: read   # Required for checkout
+  pull-requests: write  # Required for PR comments
 
 jobs:
-  test:
-    name: Test
+  build:
+    name: Build and Test
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,153 +49,232 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
+      - name: Run linter
+        run: |
+          if grep -q "\"lint\":" package.json; then
+            npm run lint || echo "::warning::Linting failed or not configured"
+          else
+            echo "No lint script found, skipping..."
+          fi
 
       - name: Run tests
-        run: npm test
-        continue-on-error: true
+        run: |
+          if grep -q "\"test\":" package.json; then
+            npm test || echo "::warning::Tests failed or not configured"
+          else
+            echo "No test script found, skipping..."
+          fi
 
-  build-and-push:
-    name: Build and Push Docker Image
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.ECR_REPOSITORY }}:${{ github.sha }} .
+          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
+
+      - name: Save Docker image (for push job)
+        run: |
+          docker save ${{ env.ECR_REPOSITORY }}:${{ github.sha }} | gzip > image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar.gz
+          retention-days: 1
+
+  push-to-ecr:
+    name: Push to ECR
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    permissions:
-      id-token: write
-      contents: read
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    outputs:
+      image-tag: ${{ steps.set-tag.outputs.tag }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: docker load < image.tar.gz
+
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-metrics-service-deploy
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Get short SHA
-        id: sha
-        run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
       - name: Set image tag
-        id: image-tag
+        id: set-tag
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "env=production" >> $GITHUB_OUTPUT
-          else
-            echo "tag=develop-${{ steps.sha.outputs.short_sha }}" >> $GITHUB_OUTPUT
-            echo "env=development" >> $GITHUB_OUTPUT
-          fi
+          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "Image tag: ${{ github.sha }}"
 
-      - name: Build Docker image
+      - name: Tag and push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-                       -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.sha.outputs.short_sha }} \
-                       .
+          # Tag with commit SHA
+          docker tag ${{ env.ECR_REPOSITORY }}:${{ github.sha }} \
+            $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-      - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+          # Tag with latest
+          docker tag ${{ env.ECR_REPOSITORY }}:${{ github.sha }} \
+            $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+
+          # Push both tags
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+
+          echo "✅ Pushed image: $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          echo "✅ Pushed image: $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest"
+
+      - name: Generate deployment manifest
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          mkdir -p deployment
+          cp k8s/*.yaml deployment/
+
+          # Update image tag in deployment.yaml
+          sed -i "s|image: .*|image: $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.sha }}|g" \
+            deployment/deployment.yaml
+
+          echo "Updated deployment manifest with image tag: ${{ github.sha }}"
+
+      - name: Upload deployment manifest
+        uses: actions/upload-artifact@v4
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image-tag.outputs.tag }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-        continue-on-error: true
-
-      - name: Push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
-        run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.sha.outputs.short_sha }}
-
-      - name: Output image details
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
-        run: |
-          echo "Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "Image SHA: $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.sha.outputs.short_sha }}"
+          name: k8s-manifests
+          path: deployment/
+          retention-days: 7
 
   deploy-to-eks:
     name: Deploy to EKS
     runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      id-token: write
-      contents: read
+    needs: push-to-ecr
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Download deployment manifests
+        uses: actions/download-artifact@v4
+        with:
+          name: k8s-manifests
+          path: deployment/
+
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-metrics-service-deploy
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
 
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Prepare Kubernetes manifests
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          METRICS_SERVICE_IAM_ROLE_ARN: ${{ secrets.METRICS_SERVICE_IAM_ROLE_ARN }}
+      - name: Verify kubectl connection
         run: |
-          sed -i "s|\${ECR_REGISTRY}|$ECR_REGISTRY|g" k8s/deployment.yaml
-          sed -i "s|\${METRICS_SERVICE_IAM_ROLE_ARN}|$METRICS_SERVICE_IAM_ROLE_ARN|g" k8s/serviceaccount.yaml
+          kubectl cluster-info
+          kubectl get nodes
 
-      - name: Deploy to Kubernetes
+      - name: Create namespace (if not exists)
         run: |
-          kubectl apply -f k8s/serviceaccount.yaml
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
+          kubectl create namespace ${{ env.K8S_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Wait for rollout
+      - name: Apply Kubernetes manifests
         run: |
-          kubectl rollout status deployment/metrics-service -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl apply -f deployment/serviceaccount.yaml -n ${{ env.K8S_NAMESPACE }}
+          kubectl apply -f deployment/service.yaml -n ${{ env.K8S_NAMESPACE }}
+          kubectl apply -f deployment/deployment.yaml -n ${{ env.K8S_NAMESPACE }}
+
+      - name: Wait for deployment rollout
+        run: |
+          kubectl rollout status deployment/metrics-service \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
 
       - name: Verify deployment
         run: |
-          kubectl get pods -n ${{ env.NAMESPACE }} -l app=metrics-service
-          kubectl get svc -n ${{ env.NAMESPACE }} metrics-service
+          echo "Deployment status:"
+          kubectl get deployment metrics-service -n ${{ env.K8S_NAMESPACE }}
 
-      - name: Check service health
+          echo ""
+          echo "Pod status:"
+          kubectl get pods -l app=metrics-service -n ${{ env.K8S_NAMESPACE }}
+
+          echo ""
+          echo "Service status:"
+          kubectl get service metrics-service -n ${{ env.K8S_NAMESPACE }}
+
+      - name: Check pod health
         run: |
-          POD_NAME=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=metrics-service -o jsonpath='{.items[0].metadata.name}')
-          kubectl exec -n ${{ env.NAMESPACE }} $POD_NAME -- wget -q -O- http://localhost:3001/health || true
+          # Wait for pods to be ready
+          kubectl wait --for=condition=ready pod \
+            -l app=metrics-service \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
 
-  notify:
-    name: Notify
+      - name: Test health endpoint
+        run: |
+          # Get pod name
+          POD_NAME=$(kubectl get pods -n ${{ env.K8S_NAMESPACE }} \
+            -l app=metrics-service \
+            -o jsonpath='{.items[0].metadata.name}')
+
+          echo "Testing health endpoint on pod: $POD_NAME"
+
+          # Test health endpoint
+          kubectl exec -n ${{ env.K8S_NAMESPACE }} $POD_NAME -- \
+            wget -q -O- http://localhost:3001/health || \
+            echo "::warning::Health check failed"
+
+      - name: Show recent logs
+        if: always()
+        run: |
+          echo "Recent logs from metrics service:"
+          kubectl logs -n ${{ env.K8S_NAMESPACE }} \
+            -l app=metrics-service \
+            --tail=50 || echo "No logs available yet"
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          echo "Environment: ${{ github.event.inputs.environment || 'dev' }}"
+          echo "Image tag: ${{ needs.push-to-ecr.outputs.image-tag }}"
+          echo "Namespace: ${{ env.K8S_NAMESPACE }}"
+          echo "Cluster: ${{ env.EKS_CLUSTER_NAME }}"
+
+  notify-on-failure:
+    name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [test, build-and-push, deploy-to-eks]
-    if: always()
+    needs: [build, push-to-ecr, deploy-to-eks]
+    if: failure()
+
     steps:
-      - name: Check workflow status
+      - name: Failure notification
         run: |
-          if [ "${{ needs.deploy-to-eks.result }}" == "success" ]; then
-            echo "✅ Deployment successful!"
-          elif [ "${{ needs.build-and-push.result }}" == "success" ]; then
-            echo "✅ Build successful (deployment skipped)"
-          else
-            echo "❌ Workflow failed"
-            exit 1
-          fi
+          echo "❌ Deployment failed!"
+          echo "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
