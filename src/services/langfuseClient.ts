@@ -74,17 +74,72 @@ export class LangfuseClient {
 
       logger.info(`Found ${unprocessedTraces.length} unprocessed traces out of ${traces.length} total`);
 
-      return unprocessedTraces.map((trace: any) => ({
-        id: trace.id,
-        name: trace.name,
-        metadata: trace.metadata || {},
-        output: trace.output,
-        input: trace.input,
-        timestamp: new Date(trace.timestamp),
-      }));
+      // Fetch full trace details with observations to get the actual output
+      const tracesWithOutput = await Promise.all(
+        unprocessedTraces.map(async (trace: any) => {
+          try {
+            const output = await this.getTraceOutput(trace.id);
+            return {
+              id: trace.id,
+              name: trace.name,
+              metadata: trace.metadata || {},
+              output,
+              input: trace.input,
+              timestamp: new Date(trace.timestamp),
+            };
+          } catch (error) {
+            logger.warn(`Failed to get output for trace ${trace.id}`, { error });
+            return {
+              id: trace.id,
+              name: trace.name,
+              metadata: trace.metadata || {},
+              output: null,
+              input: trace.input,
+              timestamp: new Date(trace.timestamp),
+            };
+          }
+        })
+      );
+
+      return tracesWithOutput;
     } catch (error) {
       logger.error('Failed to get unprocessed traces', { error });
       throw error;
+    }
+  }
+
+  /**
+   * Get trace output from observations
+   * The actual AI output is in the GENERATION observation, not trace.output
+   */
+  private async getTraceOutput(traceId: string): Promise<any> {
+    try {
+      const response = await this.fetchWithRetry(
+        `${this.getBaseUrl()}/api/public/traces/${traceId}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        }
+      );
+
+      const trace = await response.json();
+      const observations = trace.observations || [];
+
+      // Find the GENERATION observation with output
+      const generationObs = observations.find((obs: any) =>
+        obs.type === 'GENERATION' && obs.output
+      );
+
+      if (generationObs) {
+        logger.debug(`Found generation output for trace ${traceId}`);
+        return generationObs.output;
+      }
+
+      logger.debug(`No generation output found for trace ${traceId}`);
+      return null;
+    } catch (error) {
+      logger.error(`Failed to get trace output for ${traceId}`, { error });
+      return null;
     }
   }
 
