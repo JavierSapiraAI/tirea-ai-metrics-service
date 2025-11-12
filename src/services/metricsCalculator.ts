@@ -33,46 +33,73 @@ export class MetricsCalculator {
   calculateMetrics(extraction: AIExtraction, groundTruth: GroundTruthDocument): MedicalMetrics {
     try {
       logger.info(`Calculating metrics for document: ${extraction.document_id}`);
+      logger.debug('Extraction data:', { extraction });
+      logger.debug('Ground truth data:', { groundTruth });
 
       // 1. Diagnostico F1 scores (exact and soft)
-      const diagnosticoExact = calculateExactF1(extraction.diagnostico, groundTruth.diagnostico);
-      const diagnosticoSoft = calculateSoftF1(extraction.diagnostico, groundTruth.diagnostico);
-
-      logger.debug('Diagnostico metrics calculated', {
-        exact: diagnosticoExact.f1,
-        soft: diagnosticoSoft.f1,
-      });
+      let diagnosticoExact, diagnosticoSoft;
+      try {
+        diagnosticoExact = calculateExactF1(extraction.diagnostico, groundTruth.diagnostico);
+        diagnosticoSoft = calculateSoftF1(extraction.diagnostico, groundTruth.diagnostico);
+        logger.debug('Diagnostico metrics calculated', {
+          exact: diagnosticoExact.f1,
+          soft: diagnosticoSoft.f1,
+        });
+      } catch (err) {
+        logger.error('Failed at diagnostico calculation', { err });
+        throw new Error(`Diagnostico calc failed: ${err}`);
+      }
 
       // 2. CIE-10 validation (exact and prefix)
-      const cie10Validation = validateCIE10Codes(extraction.cie10, groundTruth.cie10);
-
-      logger.debug('CIE-10 metrics calculated', {
-        exact: cie10Validation.exactAccuracy,
-        prefix: cie10Validation.prefixAccuracy,
-      });
+      let cie10Validation;
+      try {
+        cie10Validation = validateCIE10Codes(extraction.cie10, groundTruth.cie10);
+        logger.debug('CIE-10 metrics calculated', {
+          exact: cie10Validation.exactAccuracy,
+          prefix: cie10Validation.prefixAccuracy,
+        });
+      } catch (err) {
+        logger.error('Failed at CIE-10 calculation', { err });
+        throw new Error(`CIE-10 calc failed: ${err}`);
+      }
 
       // 3. Destino alta accuracy
-      const destinoResult = calculateFieldAccuracy(extraction.destino_alta, groundTruth.destino_alta);
-
-      logger.debug('Destino alta accuracy calculated', {
-        accuracy: destinoResult.accuracy,
-        predicted: extraction.destino_alta,
-        groundTruth: groundTruth.destino_alta,
-      });
+      let destinoResult;
+      try {
+        destinoResult = calculateFieldAccuracy(extraction.destino_alta, groundTruth.destino_alta);
+        logger.debug('Destino alta accuracy calculated', {
+          accuracy: destinoResult.accuracy,
+          predicted: extraction.destino_alta,
+          groundTruth: groundTruth.destino_alta,
+        });
+      } catch (err) {
+        logger.error('Failed at destino alta calculation', { err });
+        throw new Error(`Destino alta calc failed: ${err}`);
+      }
 
       // 4. Medicamentos F1 score
-      const medicamentosF1 = calculateSoftF1(extraction.medicamentos, groundTruth.medicamentos);
-
-      logger.debug('Medicamentos F1 calculated', {
-        f1: medicamentosF1.f1,
-      });
+      let medicamentosF1;
+      try {
+        medicamentosF1 = calculateSoftF1(extraction.medicamentos, groundTruth.medicamentos);
+        logger.debug('Medicamentos F1 calculated', {
+          f1: medicamentosF1.f1,
+        });
+      } catch (err) {
+        logger.error('Failed at medicamentos calculation', { err });
+        throw new Error(`Medicamentos calc failed: ${err}`);
+      }
 
       // 5. Consultas F1 score
-      const consultasF1 = calculateSoftF1(extraction.consultas, groundTruth.consultas);
-
-      logger.debug('Consultas F1 calculated', {
-        f1: consultasF1.f1,
-      });
+      let consultasF1;
+      try {
+        consultasF1 = calculateSoftF1(extraction.consultas, groundTruth.consultas);
+        logger.debug('Consultas F1 calculated', {
+          f1: consultasF1.f1,
+        });
+      } catch (err) {
+        logger.error('Failed at consultas calculation', { err });
+        throw new Error(`Consultas calc failed: ${err}`);
+      }
 
       // 6. Calculate overall average
       const scores = [
@@ -102,7 +129,26 @@ export class MetricsCalculator {
 
       return metrics;
     } catch (error) {
-      logger.error(`Failed to calculate metrics for document: ${extraction.document_id}`, { error });
+      // Direct console logging to bypass logger serialization issues
+      console.error(`[MetricsCalculator] ERROR for ${extraction.document_id}:`);
+      console.error('Error type:', typeof error);
+      console.error('Error instance:', error instanceof Error);
+      if (error instanceof Error) {
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      } else {
+        console.error('Error value:', error);
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error(`Failed to calculate metrics for document: ${extraction.document_id}`, {
+        errorMessage,
+        errorStack,
+        errorType: typeof error,
+        isError: error instanceof Error,
+      });
       throw error;
     }
   }
@@ -140,22 +186,72 @@ export class MetricsCalculator {
         }
       }
 
-      // Validate required fields
-      const requiredFields = ['diagnostico', 'cie10', 'destino_alta', 'medicamentos', 'consultas'];
-      for (const field of requiredFields) {
-        if (!(field in extractedData)) {
-          logger.warn(`Missing required field: ${field}`);
-          return null;
+      // Transform AI service output format to internal format
+      // AI service uses: diagnosticos, destino_alta.tipo, continuidad_asistencial.medicacion_continuada, etc.
+      // Internal format uses: diagnostico, destino_alta (string), medicamentos, consultas
+
+      // Extract diagnosticos (plural)
+      let diagnostico = [];
+      if (Array.isArray(extractedData.diagnosticos)) {
+        diagnostico = extractedData.diagnosticos.map((d: any) => d.texto_original || d);
+      } else if (Array.isArray(extractedData.diagnostico)) {
+        diagnostico = extractedData.diagnostico;
+      }
+
+      // Extract CIE-10 codes
+      let cie10 = [];
+      if (Array.isArray(extractedData.diagnosticos)) {
+        cie10 = extractedData.diagnosticos
+          .map((d: any) => d.codigo_cie10 || d.codigo_cie10_sugerido)
+          .filter((c: string) => c && c !== '');
+      } else if (Array.isArray(extractedData.cie10)) {
+        cie10 = extractedData.cie10;
+      }
+
+      // Extract destino_alta (may be object or string)
+      let destino_alta = '';
+      if (extractedData.destino_alta) {
+        if (typeof extractedData.destino_alta === 'object') {
+          destino_alta = extractedData.destino_alta.tipo || '';
+        } else {
+          destino_alta = String(extractedData.destino_alta);
         }
+      }
+
+      // Extract medicamentos (may be nested in continuidad_asistencial)
+      let medicamentos = [];
+      if (extractedData.continuidad_asistencial?.medicacion_continuada) {
+        medicamentos = Array.isArray(extractedData.continuidad_asistencial.medicacion_continuada)
+          ? extractedData.continuidad_asistencial.medicacion_continuada
+          : [];
+      } else if (Array.isArray(extractedData.medicamentos)) {
+        medicamentos = extractedData.medicamentos;
+      }
+
+      // Extract consultas (may be nested in continuidad_asistencial)
+      let consultas = [];
+      if (extractedData.continuidad_asistencial?.consultas) {
+        consultas = Array.isArray(extractedData.continuidad_asistencial.consultas)
+          ? extractedData.continuidad_asistencial.consultas
+          : [];
+      } else if (Array.isArray(extractedData.consultas)) {
+        consultas = extractedData.consultas;
+      }
+
+      // Validate at least some data was extracted
+      if (diagnostico.length === 0 && cie10.length === 0 && !destino_alta &&
+          medicamentos.length === 0 && consultas.length === 0) {
+        logger.warn('No valid data could be extracted from trace output');
+        return null;
       }
 
       return {
         document_id: extractedData.document_id || '',
-        diagnostico: Array.isArray(extractedData.diagnostico) ? extractedData.diagnostico : [],
-        cie10: Array.isArray(extractedData.cie10) ? extractedData.cie10 : [],
-        destino_alta: extractedData.destino_alta || '',
-        medicamentos: Array.isArray(extractedData.medicamentos) ? extractedData.medicamentos : [],
-        consultas: Array.isArray(extractedData.consultas) ? extractedData.consultas : [],
+        diagnostico,
+        cie10,
+        destino_alta,
+        medicamentos,
+        consultas,
       };
     } catch (error) {
       logger.error('Failed to extract data from trace', { error });

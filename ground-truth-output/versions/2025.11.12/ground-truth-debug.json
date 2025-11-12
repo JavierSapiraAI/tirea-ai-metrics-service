@@ -1,0 +1,416 @@
+[
+  {
+    "document_id": "anonimizado PV.pdf",
+    "diagnostico": [
+      "Contusión de talón izquierdo post accidente de tráfico"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "No"
+    ],
+    "raw_rows": [
+      {
+        "row": 7,
+        "section": "diagnostico",
+        "value": "Contusión de talón izquierdo post accidente de tráfico"
+      },
+      {
+        "row": 9,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 11,
+        "section": "consultas",
+        "value": "No"
+      }
+    ]
+  },
+  {
+    "document_id": "Inf. medicos para CAS-TIREA.pdf",
+    "diagnostico": [],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "LABORATORIO"
+    ],
+    "raw_rows": [
+      {
+        "row": 16,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 18,
+        "section": "consultas",
+        "value": "LABORATORIO"
+      }
+    ]
+  },
+  {
+    "document_id": "Inform Urgencia Andalucia.pdf",
+    "diagnostico": [
+      "Prealerta código trauma (Diagnostico de derivacion al alta)"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "Consultas por MAP"
+    ],
+    "raw_rows": [
+      {
+        "row": 21,
+        "section": "diagnostico",
+        "value": "Prealerta código trauma (Diagnostico de derivacion al alta)"
+      },
+      {
+        "row": 23,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 25,
+        "section": "consultas",
+        "value": "Consultas por MAP"
+      }
+    ]
+  },
+  {
+    "document_id": "Informe Alta Hospitalizacion_UCI Galicia.pdf",
+    "diagnostico": [
+      "Politraumatismo en relación con atropello",
+      "Traumatismo pélvico: Fracturas conminutas y desplazadas de pala ilíaca",
+      "Acetábulo y rama isquiopubiana derechas con hematoma en región obturatriz asociado",
+      "Fractura de rama iliopubiana derecha.",
+      "Traumatismo torácico: Fractura arcos costales 3a a 6a, Fractura clavícula derecha",
+      "TCE leve y traumatismo facial leves."
+    ],
+    "cie10": [],
+    "destino_alta": "UCI\" (Hospital)",
+    "medicamentos": [],
+    "consultas": [
+      "Radiografía"
+    ],
+    "raw_rows": [
+      {
+        "row": 28,
+        "section": "diagnostico",
+        "value": "Politraumatismo en relación con atropello"
+      },
+      {
+        "row": 29,
+        "section": "diagnostico",
+        "value": "Traumatismo pélvico: Fracturas conminutas y desplazadas de pala ilíaca"
+      },
+      {
+        "row": 30,
+        "section": "diagnostico",
+        "value": "Acetábulo y rama isquiopubiana derechas con hematoma en región obturatriz asociado"
+      },
+      {
+        "row": 31,
+        "section": "diagnostico",
+        "value": "Fractura de rama iliopubiana derecha."
+      },
+      {
+        "row": 32,
+        "section": "diagnostico",
+        "value": "Traumatismo torácico: Fractura arcos costales 3a a 6a, Fractura clavícula derecha"
+      },
+      {
+        "row": 33,
+        "section": "diagnostico",
+        "value": "TCE leve y traumatismo facial leves."
+      },
+      {
+        "row": 35,
+        "section": "destino_alta",
+        "value": "UCI\" (Hospital)"
+      },
+      {
+        "row": 37,
+        "section": "consultas",
+        "value": "Radiografía"
+      }
+    ]
+  },
+  {
+    "document_id": "Informe Alta Urgencias Galicia.pdf",
+    "diagnostico": [
+      "ATROPELLO. POLICONTUSIONES",
+      "GONALGIA INTENSA POSTRAUMÁTICA"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "No"
+    ],
+    "raw_rows": [
+      {
+        "row": 40,
+        "section": "diagnostico",
+        "value": "ATROPELLO. POLICONTUSIONES"
+      },
+      {
+        "row": 41,
+        "section": "diagnostico",
+        "value": "GONALGIA INTENSA POSTRAUMÁTICA"
+      },
+      {
+        "row": 43,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 45,
+        "section": "consultas",
+        "value": "No"
+      }
+    ]
+  },
+  {
+    "document_id": "Informe asistencia F3 ICS.pdf",
+    "diagnostico": [
+      "Contusió, genoll no especificat, assistència inicial"
+    ],
+    "cie10": [
+      "S80.00XA"
+    ],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "Control per CAP\"."
+    ],
+    "raw_rows": [
+      {
+        "row": 48,
+        "section": "diagnostico",
+        "value": "Contusió, genoll no especificat, assistència inicial"
+      },
+      {
+        "row": 50,
+        "section": "cie10",
+        "value": "S80.00XA"
+      },
+      {
+        "row": 52,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 54,
+        "section": "consultas",
+        "value": "Control per CAP\"."
+      }
+    ]
+  },
+  {
+    "document_id": "Informe Hospita Andalucia.pdf",
+    "diagnostico": [
+      "Fractura de tibia derecha"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "Cita de rehabilitación\"."
+    ],
+    "raw_rows": [
+      {
+        "row": 57,
+        "section": "diagnostico",
+        "value": "Fractura de tibia derecha"
+      },
+      {
+        "row": 59,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 61,
+        "section": "consultas",
+        "value": "Cita de rehabilitación\"."
+      }
+    ]
+  },
+  {
+    "document_id": "Informe Hospitalización Tráfico SESPA.pdf",
+    "diagnostico": [
+      "Fractura pilon tibial izquierdo",
+      "Fractura de rotula izda",
+      "Fractura de clavícula izquierda desplazada",
+      "Fractura no desplazada del 2o y 3er arco costal izquierdo",
+      "Fisuras de los arcos costales 2o al 7o y fractura no desplazada del 5o arco costal derecho",
+      "Fractura anteroinferior del cuerpo vertebral L5, no desplazada"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "Curas locales cada 2 días y retirada de suturas a los 16 días, Mantener PICO hasta la resolución de la piel a nivel del tobillo.",
+      "Férula posterior durante 6 semanas para el tobillo.",
+      "Acudirá a las consultas de Julio, Agosto y Octubre según hoja de citación y realizará las Rx de control según hoja adjunta",
+      "Acudirá a consulta con Urología según citación adjunta"
+    ],
+    "raw_rows": [
+      {
+        "row": 64,
+        "section": "diagnostico",
+        "value": "Fractura pilon tibial izquierdo"
+      },
+      {
+        "row": 65,
+        "section": "diagnostico",
+        "value": "Fractura de rotula izda"
+      },
+      {
+        "row": 66,
+        "section": "diagnostico",
+        "value": "Fractura de clavícula izquierda desplazada"
+      },
+      {
+        "row": 67,
+        "section": "diagnostico",
+        "value": "Fractura no desplazada del 2o y 3er arco costal izquierdo"
+      },
+      {
+        "row": 68,
+        "section": "diagnostico",
+        "value": "Fisuras de los arcos costales 2o al 7o y fractura no desplazada del 5o arco costal derecho"
+      },
+      {
+        "row": 69,
+        "section": "diagnostico",
+        "value": "Fractura anteroinferior del cuerpo vertebral L5, no desplazada"
+      },
+      {
+        "row": 71,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 73,
+        "section": "consultas",
+        "value": "Curas locales cada 2 días y retirada de suturas a los 16 días, Mantener PICO hasta la resolución de la piel a nivel del tobillo."
+      },
+      {
+        "row": 74,
+        "section": "consultas",
+        "value": "Férula posterior durante 6 semanas para el tobillo."
+      },
+      {
+        "row": 75,
+        "section": "consultas",
+        "value": "Acudirá a las consultas de Julio, Agosto y Octubre según hoja de citación y realizará las Rx de control según hoja adjunta"
+      },
+      {
+        "row": 76,
+        "section": "consultas",
+        "value": "Acudirá a consulta con Urología según citación adjunta"
+      }
+    ]
+  },
+  {
+    "document_id": "Informe Urgencias Tráfico SESPA.pdf",
+    "diagnostico": [
+      "Fx luxación de codo izquierdo"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "No"
+    ],
+    "raw_rows": [
+      {
+        "row": 79,
+        "section": "diagnostico",
+        "value": "Fx luxación de codo izquierdo"
+      },
+      {
+        "row": 81,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 83,
+        "section": "consultas",
+        "value": "No"
+      }
+    ]
+  },
+  {
+    "document_id": "MODELO INFORME HOSPITALIZACIÓN Madrid.pdf",
+    "diagnostico": [
+      "Sepsis urinaria 2º a mal funcionamiento de talla vesical"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "Revisión en Consultas de Urología con CT de control, se adjunta cita"
+    ],
+    "raw_rows": [
+      {
+        "row": 86,
+        "section": "diagnostico",
+        "value": "Sepsis urinaria 2º a mal funcionamiento de talla vesical"
+      },
+      {
+        "row": 88,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 90,
+        "section": "consultas",
+        "value": "Revisión en Consultas de Urología con CT de control, se adjunta cita"
+      }
+    ]
+  },
+  {
+    "document_id": "MODEL INFORME URGENCIAS Madrid.pdf",
+    "diagnostico": [
+      "Contusión de antebrazo derecho"
+    ],
+    "cie10": [],
+    "destino_alta": "Domicilio",
+    "medicamentos": [],
+    "consultas": [
+      "Pediatra",
+      "Revisión en Pediatra (Médico de atención primaria) en el plazo de 7-10 días desde la atención en urgencias"
+    ],
+    "raw_rows": [
+      {
+        "row": 93,
+        "section": "diagnostico",
+        "value": "Contusión de antebrazo derecho"
+      },
+      {
+        "row": 95,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 97,
+        "section": "consultas",
+        "value": "Pediatra"
+      },
+      {
+        "row": 99,
+        "section": "destino_alta",
+        "value": "Domicilio"
+      },
+      {
+        "row": 101,
+        "section": "consultas",
+        "value": "Revisión en Pediatra (Médico de atención primaria) en el plazo de 7-10 días desde la atención en urgencias"
+      }
+    ]
+  }
+]

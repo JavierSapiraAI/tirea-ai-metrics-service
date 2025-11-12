@@ -159,7 +159,26 @@ export class TraceProcessor {
       }
 
       // Extract AI extraction data from trace output
-      const extraction = this.metricsCalculator.extractDataFromTrace(trace.output);
+      let traceOutput = trace.output;
+
+      // If trace.output is null, fetch observations to get the generation output
+      if (!traceOutput) {
+        logger.debug(`Trace ${trace.id} has no direct output, fetching observations...`);
+        const observations = await this.langfuseClient.getTraceObservations(trace.id);
+
+        // Find the first GENERATION type observation
+        const generationObs = observations.find((obs: any) => obs.type === 'GENERATION');
+
+        if (generationObs && generationObs.output) {
+          traceOutput = generationObs.output;
+          logger.debug(`Found output in generation observation for trace ${trace.id}`);
+        } else {
+          logger.warn(`No generation observation with output found for trace ${trace.id}, skipping`);
+          return false;
+        }
+      }
+
+      const extraction = this.metricsCalculator.extractDataFromTrace(traceOutput);
 
       if (!extraction) {
         logger.warn(`Failed to extract data from trace ${trace.id}, skipping`);

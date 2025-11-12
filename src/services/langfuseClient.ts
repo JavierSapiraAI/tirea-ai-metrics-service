@@ -89,6 +89,32 @@ export class LangfuseClient {
   }
 
   /**
+   * Get observations for a trace (to extract output if not in trace directly)
+   */
+  async getTraceObservations(traceId: string): Promise<any[]> {
+    try {
+      logger.debug(`Fetching observations for trace: ${traceId}`);
+
+      const response = await this.fetchWithRetry(
+        `${this.getBaseUrl()}/api/public/observations?traceId=${traceId}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json() as { data?: any[] };
+      const observations = data.data || [];
+
+      logger.debug(`Found ${observations.length} observations for trace ${traceId}`);
+      return observations;
+    } catch (error) {
+      logger.error(`Failed to get observations for trace ${traceId}`, { error });
+      return [];
+    }
+  }
+
+    /**
    * Push medical metrics as scores to a trace
    */
   async pushMetrics(traceId: string, metrics: MedicalMetrics): Promise<void> {
