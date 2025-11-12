@@ -10,6 +10,25 @@ export interface F1ScoreResult {
 }
 
 /**
+ * Safely converts array items to strings, filtering out invalid values
+ */
+function toStringArray(arr: any[]): string[] {
+  return arr
+    .filter(item => item != null) // Remove null/undefined
+    .map(item => {
+      if (typeof item === 'string') {
+        return item;
+      }
+      if (typeof item === 'object') {
+        return JSON.stringify(item);
+      }
+      return String(item);
+    })
+    .map(s => s.toLowerCase().trim())
+    .filter(s => s.length > 0); // Remove empty strings
+}
+
+/**
  * Calculate F1 score with exact matching
  */
 export function calculateExactF1(predicted: string[], groundTruth: string[]): F1ScoreResult {
@@ -22,8 +41,8 @@ export function calculateExactF1(predicted: string[], groundTruth: string[]): F1
   }
 
   // Normalize strings for comparison (lowercase, trim)
-  const normalizedPredicted = predicted.map(s => s.toLowerCase().trim());
-  const normalizedGroundTruth = groundTruth.map(s => s.toLowerCase().trim());
+  const normalizedPredicted = toStringArray(predicted);
+  const normalizedGroundTruth = toStringArray(groundTruth);
 
   // Calculate true positives (exact matches)
   const truePositives = normalizedPredicted.filter(p =>
@@ -50,8 +69,8 @@ export function calculateSoftF1(predicted: string[], groundTruth: string[], thre
   }
 
   // Normalize strings
-  const normalizedPredicted = predicted.map(s => s.toLowerCase().trim());
-  const normalizedGroundTruth = groundTruth.map(s => s.toLowerCase().trim());
+  const normalizedPredicted = toStringArray(predicted);
+  const normalizedGroundTruth = toStringArray(groundTruth);
 
   let truePositives = 0;
   const matchedGroundTruth = new Set<number>();
