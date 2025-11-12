@@ -116,27 +116,50 @@ export class GroundTruthService {
       });
 
       const pointerResponse = await this.s3Client.send(pointerCommand);
-      const actualPath = await pointerResponse.Body?.transformToString();
+      const pointerContent = await pointerResponse.Body?.transformToString();
 
-      if (!actualPath) {
+      if (!pointerContent) {
         logger.warn(`Pointer file ${pointerKey} is empty`);
         return [];
       }
 
-      const trimmedPath = actualPath.trim();
-      logger.info(`Loading ground truth from: ${trimmedPath}`);
+      // Parse pointer file - it can be either plain text path or JSON
+      let actualPath: string;
+      try {
+        const pointerJson = JSON.parse(pointerContent.trim());
+        if (pointerJson.s3_uri) {
+          // Extract path from s3://bucket-name/path format
+          const s3UriMatch = pointerJson.s3_uri.match(/^s3:\/\/[^/]+\/(.+)$/);
+          if (s3UriMatch) {
+            actualPath = s3UriMatch[1];
+            logger.info(`Parsed S3 URI from JSON pointer: ${actualPath}`);
+          } else {
+            logger.warn(`Invalid s3_uri format in pointer file: ${pointerJson.s3_uri}`);
+            return [];
+          }
+        } else {
+          logger.warn(`Pointer JSON missing s3_uri field`);
+          return [];
+        }
+      } catch (e) {
+        // Not JSON, treat as plain text path
+        actualPath = pointerContent.trim();
+        logger.info(`Using plain text path from pointer: ${actualPath}`);
+      }
+
+      logger.info(`Loading ground truth from: ${actualPath}`);
 
       // Load the actual CSV file
       const dataCommand = new GetObjectCommand({
         Bucket: this.bucketName,
-        Key: trimmedPath,
+        Key: actualPath,
       });
 
       const dataResponse = await this.s3Client.send(dataCommand);
       const csvContent = await dataResponse.Body?.transformToString();
 
       if (!csvContent) {
-        logger.warn(`Data file ${trimmedPath} is empty`);
+        logger.warn(`Data file ${actualPath} is empty`);
         return [];
       }
 
