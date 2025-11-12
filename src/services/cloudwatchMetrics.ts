@@ -1,5 +1,7 @@
 import { CloudWatchClient, PutMetricDataCommand, MetricDatum, StandardUnit } from '@aws-sdk/client-cloudwatch';
-import { logger } from '../utils/logger';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('CloudWatchMetrics');
 
 export interface ProcessingMetrics {
   total: number;

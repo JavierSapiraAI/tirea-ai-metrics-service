@@ -186,22 +186,44 @@ export class MetricsCalculator {
         }
       }
 
+      // Handle old format with 'extracted' wrapper (backward compatibility for October 28 traces)
+      if (extractedData.extracted && typeof extractedData.extracted === 'object') {
+        logger.debug('Found old format with extracted wrapper, unwrapping...');
+        extractedData = extractedData.extracted;
+      }
+
+      // Check for AI processing errors and log them (but still try to extract partial data)
+      if (extractedData.error) {
+        logger.warn('AI processing error found in trace output', {
+          error: extractedData.error,
+          hasData: !!(extractedData.diagnosticos || extractedData.diagnosticos_array || extractedData.destino_alta)
+        });
+        // Don't return null yet - there might still be partial data we can use
+      }
+
       // Transform AI service output format to internal format
       // AI service uses: diagnosticos, destino_alta.tipo, continuidad_asistencial.medicacion_continuada, etc.
       // Internal format uses: diagnostico, destino_alta (string), medicamentos, consultas
 
-      // Extract diagnosticos (plural)
+      // Extract diagnosticos (plural) - handle multiple field names for backward compatibility
       let diagnostico = [];
       if (Array.isArray(extractedData.diagnosticos)) {
         diagnostico = extractedData.diagnosticos.map((d: any) => d.texto_original || d);
+      } else if (Array.isArray(extractedData.diagnosticos_array)) {
+        // Handle diagnosticos_array format
+        diagnostico = extractedData.diagnosticos_array.map((d: any) => d.texto_original || d);
       } else if (Array.isArray(extractedData.diagnostico)) {
         diagnostico = extractedData.diagnostico;
       }
 
-      // Extract CIE-10 codes
+      // Extract CIE-10 codes - handle multiple field names
       let cie10 = [];
       if (Array.isArray(extractedData.diagnosticos)) {
         cie10 = extractedData.diagnosticos
+          .map((d: any) => d.codigo_cie10 || d.codigo_cie10_sugerido)
+          .filter((c: string) => c && c !== '');
+      } else if (Array.isArray(extractedData.diagnosticos_array)) {
+        cie10 = extractedData.diagnosticos_array
           .map((d: any) => d.codigo_cie10 || d.codigo_cie10_sugerido)
           .filter((c: string) => c && c !== '');
       } else if (Array.isArray(extractedData.cie10)) {
@@ -239,10 +261,32 @@ export class MetricsCalculator {
       }
 
       // Validate at least some data was extracted
-      if (diagnostico.length === 0 && cie10.length === 0 && !destino_alta &&
-          medicamentos.length === 0 && consultas.length === 0) {
-        logger.warn('No valid data could be extracted from trace output');
+      // Accept trace if it has destino_alta OR at least one other field with data
+      // This is less strict to handle partial extractions
+      const hasAnyData = destino_alta ||
+                         diagnostico.length > 0 ||
+                         cie10.length > 0 ||
+                         medicamentos.length > 0 ||
+                         consultas.length > 0;
+
+      if (!hasAnyData) {
+        logger.warn('No valid data could be extracted from trace output', {
+          outputType: typeof extractedData,
+          outputKeys: typeof extractedData === 'object' && extractedData !== null ? Object.keys(extractedData) : [],
+          hasDocumentId: !!extractedData.document_id,
+          hasError: !!extractedData.error,
+          errorMessage: extractedData.error || 'none',
+          outputSample: JSON.stringify(extractedData).substring(0, 500),
+        });
         return null;
+      }
+
+      // Log if we're accepting partial data
+      if (destino_alta && diagnostico.length === 0 && cie10.length === 0) {
+        logger.info('Accepting trace with partial data (destino_alta only)', {
+          destino_alta,
+          documentId: extractedData.document_id || extractedData.documentId
+        });
       }
 
       return {

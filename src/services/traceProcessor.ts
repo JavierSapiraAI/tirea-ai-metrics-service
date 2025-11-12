@@ -141,8 +141,8 @@ export class TraceProcessor {
         skipped: skipCount,
         errors: errorCount,
         durationMs: duration,
-        groundTruthDocuments: cacheStats.documentCount,
-        groundTruthCacheAge: cacheStats.cacheAge,
+        groundTruthDocuments: cacheStats.size,
+        groundTruthCacheAge: cacheStats.ageMs ? Math.floor(cacheStats.ageMs / 1000) : undefined,
       });
     } catch (error) {
       logger.error('Batch processing failed', { error });
