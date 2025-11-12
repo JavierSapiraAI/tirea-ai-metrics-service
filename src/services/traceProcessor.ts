@@ -1,6 +1,7 @@
 import { GroundTruthService } from './groundTruthService';
 import { MetricsCalculator } from './metricsCalculator';
 import { LangfuseClient } from './langfuseClient';
+import { CloudWatchMetricsService } from './cloudwatchMetrics';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('TraceProcessor');
@@ -9,6 +10,7 @@ export class TraceProcessor {
   private groundTruthService: GroundTruthService;
   private metricsCalculator: MetricsCalculator;
   private langfuseClient: LangfuseClient;
+  private cloudwatchMetrics: CloudWatchMetricsService;
   private pollInterval: number;
   private maxTracesPerPoll: number;
   private isRunning: boolean = false;
@@ -18,6 +20,7 @@ export class TraceProcessor {
     this.groundTruthService = new GroundTruthService();
     this.metricsCalculator = new MetricsCalculator();
     this.langfuseClient = new LangfuseClient();
+    this.cloudwatchMetrics = new CloudWatchMetricsService();
     this.pollInterval = parseInt(process.env.POLL_INTERVAL || '60000', 10); // 60 seconds
     this.maxTracesPerPoll = parseInt(process.env.MAX_TRACES_PER_POLL || '100', 10);
 
@@ -129,6 +132,17 @@ export class TraceProcessor {
         skipped: skipCount,
         errors: errorCount,
         durationMs: duration,
+      });
+
+      // Publish metrics to CloudWatch
+      await this.cloudwatchMetrics.publishBatchMetrics({
+        total: traces.length,
+        success: successCount,
+        skipped: skipCount,
+        errors: errorCount,
+        durationMs: duration,
+        groundTruthDocuments: cacheStats.documentCount,
+        groundTruthCacheAge: cacheStats.cacheAge,
       });
     } catch (error) {
       logger.error('Batch processing failed', { error });

@@ -1,0 +1,110 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          [ "LangfuseMetricsService/dev", "SuccessRate", { "stat": "Average", "label": "Success Rate (%)" } ],
+          [ ".", "ErrorRate", { "stat": "Average", "label": "Error Rate (%)" } ],
+          [ ".", "SkipRate", { "stat": "Average", "label": "Skip Rate (%)" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "eu-west-2",
+        "title": "Processing Rates (%)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          [ "LangfuseMetricsService/dev", "ProcessingSuccess", { "stat": "Sum", "label": "Success" } ],
+          [ ".", "ProcessingErrors", { "stat": "Sum", "label": "Errors" } ],
+          [ ".", "ProcessingSkipped", { "stat": "Sum", "label": "Skipped" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": true,
+        "region": "eu-west-2",
+        "title": "Processing Counts",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          [ "LangfuseMetricsService/dev", "BatchProcessingDuration", { "stat": "Average", "label": "Avg" } ],
+          [ "...", { "stat": "p50", "label": "P50" } ],
+          [ "...", { "stat": "p90", "label": "P90" } ],
+          [ "...", { "stat": "p99", "label": "P99" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "eu-west-2",
+        "title": "Batch Processing Latency (ms)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          [ "LangfuseMetricsService/dev", "AverageProcessingTimePerTrace", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "eu-west-2",
+        "title": "Avg Time Per Trace (ms)",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          [ "LangfuseMetricsService/dev", "GroundTruthDocuments", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "eu-west-2",
+        "title": "Ground Truth Documents Loaded",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          [ "LangfuseMetricsService/dev", "GroundTruthCacheAgeSeconds", { "stat": "Maximum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "eu-west-2",
+        "title": "Ground Truth Cache Age (seconds)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    }
+  ]
+}
