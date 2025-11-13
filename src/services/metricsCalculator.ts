@@ -11,7 +11,6 @@ export interface AIExtraction {
   diagnostico: string[];
   cie10: string[];
   destino_alta: string;
-  medicamentos: string[];
   consultas: string[];
 }
 
@@ -21,7 +20,6 @@ export interface MedicalMetrics {
   cie10_exact_accuracy: number;
   cie10_prefix_accuracy: number;
   destino_accuracy: number;
-  medicamentos_f1: number;
   consultas_f1: number;
   overall_average: number;
 }
@@ -60,26 +58,18 @@ export class MetricsCalculator {
         groundTruth: groundTruth.destino_alta,
       });
 
-      // 4. Medicamentos F1 score
-      const medicamentosF1 = calculateSoftF1(extraction.medicamentos, groundTruth.medicamentos);
-
-      logger.debug('Medicamentos F1 calculated', {
-        f1: medicamentosF1.f1,
-      });
-
-      // 5. Consultas F1 score
+      // 4. Consultas F1 score
       const consultasF1 = calculateSoftF1(extraction.consultas, groundTruth.consultas);
 
       logger.debug('Consultas F1 calculated', {
         f1: consultasF1.f1,
       });
 
-      // 6. Calculate overall average
+      // 5. Calculate overall average (4 metrics)
       const scores = [
         diagnosticoSoft.f1,
         cie10Validation.prefixAccuracy,
         destinoResult.accuracy,
-        medicamentosF1.f1,
         consultasF1.f1,
       ];
 
@@ -91,7 +81,6 @@ export class MetricsCalculator {
         cie10_exact_accuracy: cie10Validation.exactAccuracy,
         cie10_prefix_accuracy: cie10Validation.prefixAccuracy,
         destino_accuracy: destinoResult.accuracy,
-        medicamentos_f1: medicamentosF1.f1,
         consultas_f1: consultasF1.f1,
         overall_average: Number(overallAverage.toFixed(4)),
       };
@@ -110,14 +99,12 @@ export class MetricsCalculator {
           diagnostico: extraction.diagnostico,
           cie10: extraction.cie10,
           destino_alta: extraction.destino_alta,
-          medicamentos: extraction.medicamentos?.slice(0, 2), // First 2 items for debugging
           consultas: extraction.consultas
         },
         groundTruth: {
           diagnostico: groundTruth.diagnostico,
           cie10: groundTruth.cie10,
           destino_alta: groundTruth.destino_alta,
-          medicamentos: groundTruth.medicamentos?.slice(0, 2),
           consultas: groundTruth.consultas
         }
       });
@@ -165,7 +152,7 @@ export class MetricsCalculator {
 
       // Handle legacy/direct format
       // Validate required fields
-      const requiredFields = ['diagnostico', 'cie10', 'destino_alta', 'medicamentos', 'consultas'];
+      const requiredFields = ['diagnostico', 'cie10', 'destino_alta', 'consultas'];
       for (const field of requiredFields) {
         if (!(field in extractedData)) {
           logger.warn(`Missing required field: ${field}`);
@@ -178,7 +165,6 @@ export class MetricsCalculator {
         diagnostico: Array.isArray(extractedData.diagnostico) ? extractedData.diagnostico : [],
         cie10: Array.isArray(extractedData.cie10) ? extractedData.cie10 : [],
         destino_alta: extractedData.destino_alta || '',
-        medicamentos: Array.isArray(extractedData.medicamentos) ? extractedData.medicamentos : [],
         consultas: Array.isArray(extractedData.consultas) ? extractedData.consultas : [],
       };
     } catch (error) {
@@ -209,11 +195,6 @@ export class MetricsCalculator {
         ? data.destino_alta.tipo || ''
         : data.destino_alta || '';
 
-      // Extract medicamentos (from medicacion_continuada)
-      const medicamentos = Array.isArray(data.continuidad_asistencial?.medicacion_continuada)
-        ? data.continuidad_asistencial.medicacion_continuada
-        : [];
-
       // Extract consultas (from continuidad_asistencial.consultas)
       // Consultas can be objects with 'texto' field or plain strings
       const consultas = Array.isArray(data.continuidad_asistencial?.consultas)
@@ -226,7 +207,6 @@ export class MetricsCalculator {
         diagnostico_count: diagnostico.length,
         cie10_count: cie10.length,
         destino_alta,
-        medicamentos_count: medicamentos.length,
         consultas_count: consultas.length,
       });
 
@@ -235,7 +215,6 @@ export class MetricsCalculator {
         diagnostico,
         cie10,
         destino_alta,
-        medicamentos,
         consultas,
       };
     } catch (error) {
@@ -262,7 +241,6 @@ export class MetricsCalculator {
     const hasData = groundTruth.diagnostico.length > 0 ||
                     groundTruth.cie10.length > 0 ||
                     groundTruth.destino_alta !== '' ||
-                    groundTruth.medicamentos.length > 0 ||
                     groundTruth.consultas.length > 0;
 
     if (!hasData) {

@@ -100,17 +100,13 @@ def check_if_extractable(output):
             data.get('cie10')
         )
         has_destino = bool(data.get('destino_alta'))
-        has_medicamentos = bool(
-            data.get('continuidad_asistencial', {}).get('medicacion_continuada') or
-            data.get('medicamentos')
-        )
         has_consultas = bool(
             data.get('continuidad_asistencial', {}).get('consultas') or
             data.get('consultas')
         )
 
         # At least one field must be present
-        return has_diagnostico or has_cie10 or has_destino or has_medicamentos or has_consultas
+        return has_diagnostico or has_cie10 or has_destino or has_consultas
 
     except Exception as e:
         return False

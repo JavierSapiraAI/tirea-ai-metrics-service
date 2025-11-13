@@ -9,7 +9,6 @@ export interface GroundTruthDocument {
   diagnostico: string[];
   cie10: string[];
   destino_alta: string;
-  medicamentos: string[];
   consultas: string[];
   source: 'sheets' | 'verified';
   version: string;
@@ -218,7 +217,6 @@ export class GroundTruthService {
         diagnostico: this.parseArrayField(record.diagnostico),
         cie10: this.parseArrayField(record.cie10),
         destino_alta: record.destino_alta || record.destinoAlta || '',
-        medicamentos: this.parseArrayField(record.medicamentos),
         consultas: this.parseArrayField(record.consultas),
         source,
         version: record.version || 'unknown',
@@ -258,11 +256,6 @@ export class GroundTruthService {
         // Extract destino alta
         const destinoAlta = extractedData.destino_alta?.tipo || extractedData.destino_alta?.destino || '';
 
-        // Extract medicamentos
-        const medicamentos = Array.isArray(extractedData.continuidad_asistencial?.medicacion_continuada)
-          ? extractedData.continuidad_asistencial.medicacion_continuada
-          : [];
-
         // Extract consultas
         const consultas = Array.isArray(extractedData.continuidad_asistencial?.consultas)
           ? extractedData.continuidad_asistencial.consultas
@@ -273,7 +266,6 @@ export class GroundTruthService {
           diagnostico: diagnosticos,
           cie10: cie10Codes,
           destino_alta: destinoAlta,
-          medicamentos,
           consultas,
           source,
           version: record.metadata?.version || record.version || 'verified',

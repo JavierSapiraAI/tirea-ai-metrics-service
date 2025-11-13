@@ -4,7 +4,6 @@ Fixes the extractDataFromTrace method to handle the actual AI service output for
 The AI service returns:
 - diagnosticos (plural) instead of diagnostico
 - destino_alta as object {tipo, detalles} instead of string
-- continuidad_asistencial.medicacion_continuada instead of medicamentos
 - continuidad_asistencial.consultas instead of consultas
 """
 
@@ -16,7 +15,7 @@ with open(file_path, 'r', encoding='utf-8') as f:
 
 # Find and replace the extraction logic
 old_code = '''      // Validate required fields
-      const requiredFields = ['diagnostico', 'cie10', 'destino_alta', 'medicamentos', 'consultas'];
+      const requiredFields = ['diagnostico', 'cie10', 'destino_alta', 'consultas'];
       for (const field of requiredFields) {
         if (!(field in extractedData)) {
           logger.warn(`Missing required field: ${field}`);
@@ -29,13 +28,12 @@ old_code = '''      // Validate required fields
         diagnostico: Array.isArray(extractedData.diagnostico) ? extractedData.diagnostico : [],
         cie10: Array.isArray(extractedData.cie10) ? extractedData.cie10 : [],
         destino_alta: extractedData.destino_alta || '',
-        medicamentos: Array.isArray(extractedData.medicamentos) ? extractedData.medicamentos : [],
         consultas: Array.isArray(extractedData.consultas) ? extractedData.consultas : [],
       };'''
 
 new_code = '''      // Transform AI service output format to internal format
-      // AI service uses: diagnosticos, destino_alta.tipo, continuidad_asistencial.medicacion_continuada, etc.
-      // Internal format uses: diagnostico, destino_alta (string), medicamentos, consultas
+      // AI service uses: diagnosticos, destino_alta.tipo, continuidad_asistencial.consultas
+      // Internal format uses: diagnostico, destino_alta (string), consultas
 
       // Extract diagnosticos (plural)
       let diagnostico = [];
@@ -65,16 +63,6 @@ new_code = '''      // Transform AI service output format to internal format
         }
       }
 
-      // Extract medicamentos (may be nested in continuidad_asistencial)
-      let medicamentos = [];
-      if (extractedData.continuidad_asistencial?.medicacion_continuada) {
-        medicamentos = Array.isArray(extractedData.continuidad_asistencial.medicacion_continuada)
-          ? extractedData.continuidad_asistencial.medicacion_continuada
-          : [];
-      } else if (Array.isArray(extractedData.medicamentos)) {
-        medicamentos = extractedData.medicamentos;
-      }
-
       // Extract consultas (may be nested in continuidad_asistencial)
       let consultas = [];
       if (extractedData.continuidad_asistencial?.consultas) {
@@ -87,7 +75,7 @@ new_code = '''      // Transform AI service output format to internal format
 
       // Validate at least some data was extracted
       if (diagnostico.length === 0 && cie10.length === 0 && !destino_alta &&
-          medicamentos.length === 0 && consultas.length === 0) {
+          consultas.length === 0) {
         logger.warn('No valid data could be extracted from trace output');
         return null;
       }
@@ -97,7 +85,6 @@ new_code = '''      // Transform AI service output format to internal format
         diagnostico,
         cie10,
         destino_alta,
-        medicamentos,
         consultas,
       };'''
 

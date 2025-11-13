@@ -4,11 +4,10 @@ Medical metrics calculation service for Langfuse traces. Calculates quality metr
 
 ## Features
 
-- **Medical Metrics Calculation**: 7 medical-specific quality scores
+- **Medical Metrics Calculation**: 6 medical-specific quality scores
   - Diagnostico F1 (exact and soft matching)
   - CIE-10 Code Accuracy (exact and prefix matching)
   - Destino Alta Accuracy
-  - Medicamentos F1
   - Consultas F1
   - Overall Average Score
 

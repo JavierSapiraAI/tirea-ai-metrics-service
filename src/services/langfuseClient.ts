@@ -157,7 +157,6 @@ export class LangfuseClient {
         this.createScore(traceId, 'cie10_exact_accuracy', metrics.cie10_exact_accuracy),
         this.createScore(traceId, 'cie10_prefix_accuracy', metrics.cie10_prefix_accuracy),
         this.createScore(traceId, 'destino_accuracy', metrics.destino_accuracy),
-        this.createScore(traceId, 'medicamentos_f1', metrics.medicamentos_f1),
         this.createScore(traceId, 'consultas_f1', metrics.consultas_f1),
         this.createScore(traceId, 'overall_average', metrics.overall_average),
       ];

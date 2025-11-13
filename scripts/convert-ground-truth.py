@@ -86,7 +86,6 @@ def parse_hierarchical_csv(csv_path: str) -> List[Dict[str, Any]]:
                         'diagnostico': [],
                         'cie10': [],
                         'destino_alta': '',
-                        'medicamentos': [],
                         'consultas': [],
                         'raw_rows': []  # Para debugging
                     }
@@ -102,9 +101,6 @@ def parse_hierarchical_csv(csv_path: str) -> List[Dict[str, Any]]:
                 continue
             elif first_col == "Destino al alta:":
                 current_section = 'destino_alta'
-                continue
-            elif first_col == "Medicamentos:":
-                current_section = 'medicamentos'
                 continue
             elif first_col.startswith("Consultas"):  # "Consultas y pruebas:"
                 current_section = 'consultas'
@@ -130,7 +126,7 @@ def parse_hierarchical_csv(csv_path: str) -> List[Dict[str, Any]]:
                 # Agregar valor a la sección correspondiente
                 if current_section == 'destino_alta':
                     current_doc['destino_alta'] = value
-                elif current_section in ['diagnostico', 'cie10', 'medicamentos', 'consultas']:
+                elif current_section in ['diagnostico', 'cie10', 'consultas']:
                     if value not in current_doc[current_section]:  # Evitar duplicados
                         current_doc[current_section].append(value)
 
@@ -153,7 +149,6 @@ def parse_hierarchical_csv(csv_path: str) -> List[Dict[str, Any]]:
         print(f"    - Diagnósticos: {len(doc['diagnostico'])}")
         print(f"    - CIE-10: {len(doc['cie10'])}")
         print(f"    - Destino: '{doc['destino_alta']}'")
-        print(f"    - Medicamentos: {len(doc['medicamentos'])}")
         print(f"    - Consultas: {len(doc['consultas'])}")
 
     return documents
@@ -167,7 +162,7 @@ def convert_to_flat_csv(documents: List[Dict[str, Any]]) -> str:
     output = []
 
     # Header
-    header = 'document_id,diagnostico,cie10,destino_alta,medicamentos,consultas,version\n'
+    header = 'document_id,diagnostico,cie10,destino_alta,consultas,version\n'
     output.append(header)
 
     version = datetime.now().strftime("%Y.%m.%d")
@@ -179,7 +174,6 @@ def convert_to_flat_csv(documents: List[Dict[str, Any]]) -> str:
             'diagnostico': json.dumps(doc['diagnostico'], ensure_ascii=False),
             'cie10': json.dumps(doc['cie10'], ensure_ascii=False),
             'destino_alta': doc['destino_alta'],
-            'medicamentos': json.dumps(doc['medicamentos'], ensure_ascii=False),
             'consultas': json.dumps(doc['consultas'], ensure_ascii=False),
             'version': version
         }
@@ -215,7 +209,6 @@ def validate_conversion(original_docs: List[Dict[str, Any]], csv_content: str) -
             'diagnostico': json.loads(row['diagnostico'].strip('"').replace('""', '"')),
             'cie10': json.loads(row['cie10'].strip('"').replace('""', '"')),
             'destino_alta': row['destino_alta'].strip('"'),
-            'medicamentos': json.loads(row['medicamentos'].strip('"').replace('""', '"')),
             'consultas': json.loads(row['consultas'].strip('"').replace('""', '"'))
         }
         converted_docs.append(doc)
@@ -239,7 +232,7 @@ def validate_conversion(original_docs: List[Dict[str, Any]], csv_content: str) -
             doc_issues.append(f"Document ID: '{orig['document_id']}' != '{conv['document_id']}'")
 
         # Verificar arrays (orden puede variar, pero contenido debe ser igual)
-        for field in ['diagnostico', 'cie10', 'medicamentos', 'consultas']:
+        for field in ['diagnostico', 'cie10', 'consultas']:
             orig_set = set(orig[field])
             conv_set = set(conv[field])
 
@@ -294,7 +287,6 @@ def show_comparison(original_docs: List[Dict[str, Any]], csv_content: str):
         print(f"  Diagnóstico: {doc['diagnostico']}")
         print(f"  CIE-10: {doc['cie10']}")
         print(f"  Destino: {doc['destino_alta']}")
-        print(f"  Medicamentos: {doc['medicamentos']}")
         print(f"  Consultas: {doc['consultas']}")
 
     print("\n\n[Formato Convertido - Plano CSV]")
