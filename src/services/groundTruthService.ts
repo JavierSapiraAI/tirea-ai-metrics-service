@@ -59,37 +59,55 @@ export class GroundTruthService {
    * Force refresh the cache
    */
   async refreshCache(): Promise<void> {
+    logger.info('Refreshing ground truth cache...');
+
+    // Load both sources (handle errors gracefully for each)
+    let sheetsData: GroundTruthDocument[] = [];
+    let verifiedData: GroundTruthDocument[] = [];
+
+    // Try to load from Google Sheets
     try {
-      logger.info('Refreshing ground truth cache...');
-
-      // Load both sources
-      const sheetsData = await this.loadFromS3('datasets/traces/LATEST');
-      const verifiedData = await this.loadFromS3('datasets/traces/LATEST-VERIFIED');
-
-      // Merge with precedence (verified > sheets)
-      const merged = new Map<string, GroundTruthDocument>();
-
-      // Add sheets data first
-      sheetsData.forEach((doc) => {
-        merged.set(doc.document_id, doc);
-      });
-
-      // Override with verified data
-      verifiedData.forEach((doc) => {
-        merged.set(doc.document_id, doc);
-      });
-
-      this.cache = {
-        data: merged,
-        lastUpdated: new Date(),
-        version: `sheets:${sheetsData.length}+verified:${verifiedData.length}`,
-      };
-
-      logger.info(`Ground truth cache refreshed: ${merged.size} documents loaded (${sheetsData.length} from sheets, ${verifiedData.length} verified)`);
+      sheetsData = await this.loadFromS3('datasets/traces/LATEST');
+      logger.info(`Loaded ${sheetsData.length} documents from Google Sheets`);
     } catch (error) {
-      logger.error('Failed to refresh ground truth cache', { error });
+      logger.warn('Failed to load from Google Sheets, continuing with verified data only', { error });
+    }
+
+    // Try to load from verified documents
+    try {
+      verifiedData = await this.loadFromS3('datasets/traces/LATEST-VERIFIED');
+      logger.info(`Loaded ${verifiedData.length} documents from verified sources`);
+    } catch (error) {
+      logger.warn('Failed to load from verified sources, continuing with sheets data only', { error });
+    }
+
+    // If both failed, throw error
+    if (sheetsData.length === 0 && verifiedData.length === 0) {
+      const error = new Error('Failed to load ground truth from both sources');
+      logger.error('Both ground truth sources failed', { error });
       throw error;
     }
+
+    // Merge with precedence (verified > sheets)
+    const merged = new Map<string, GroundTruthDocument>();
+
+    // Add sheets data first
+    sheetsData.forEach((doc) => {
+      merged.set(doc.document_id, doc);
+    });
+
+    // Override with verified data
+    verifiedData.forEach((doc) => {
+      merged.set(doc.document_id, doc);
+    });
+
+    this.cache = {
+      data: merged,
+      lastUpdated: new Date(),
+      version: `sheets:${sheetsData.length}+verified:${verifiedData.length}`,
+    };
+
+    logger.info(`Ground truth cache refreshed: ${merged.size} documents loaded (${sheetsData.length} from sheets, ${verifiedData.length} verified)`);
   }
 
   /**
@@ -149,22 +167,31 @@ export class GroundTruthService {
 
       logger.info(`Loading ground truth from: ${actualPath}`);
 
-      // Load the actual CSV file
+      // Load the actual data file
       const dataCommand = new GetObjectCommand({
         Bucket: this.bucketName,
         Key: actualPath,
       });
 
       const dataResponse = await this.s3Client.send(dataCommand);
-      const csvContent = await dataResponse.Body?.transformToString();
+      const fileContent = await dataResponse.Body?.transformToString();
 
-      if (!csvContent) {
+      if (!fileContent) {
         logger.warn(`Data file ${actualPath} is empty`);
         return [];
       }
 
-      // Parse CSV
-      return this.parseGroundTruthCSV(csvContent, pointerKey.includes('VERIFIED') ? 'verified' : 'sheets');
+      // Determine file type by extension or content
+      const isJSON = actualPath.endsWith('.json');
+      const source: 'sheets' | 'verified' = pointerKey.includes('VERIFIED') ? 'verified' : 'sheets';
+
+      if (isJSON) {
+        logger.info(`Parsing as JSON (${source})`);
+        return this.parseGroundTruthJSON(fileContent, source);
+      } else {
+        logger.info(`Parsing as CSV (${source})`);
+        return this.parseGroundTruthCSV(fileContent, source);
+      }
     } catch (error: any) {
       if (error.name === 'NoSuchKey') {
         logger.warn(`Ground truth file not found: ${pointerKey}`);
@@ -198,6 +225,62 @@ export class GroundTruthService {
       }));
     } catch (error) {
       logger.error('Failed to parse ground truth CSV', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Parse ground truth JSON into structured documents
+   * This handles the format from Tirea-AI verified documents export
+   */
+  private parseGroundTruthJSON(jsonContent: string, source: 'sheets' | 'verified'): GroundTruthDocument[] {
+    try {
+      const data = JSON.parse(jsonContent);
+
+      if (!Array.isArray(data)) {
+        logger.error('Expected JSON array, got object');
+        throw new Error('Invalid JSON format: expected array');
+      }
+
+      return data.map((record: any) => {
+        // Extract data from Tirea-AI format
+        const extractedData = record.extractedData || {};
+
+        // Extract diagnosticos and CIE-10 codes
+        const diagnosticos = Array.isArray(extractedData.diagnosticos)
+          ? extractedData.diagnosticos.map((d: any) => d.texto_original || '').filter(Boolean)
+          : [];
+
+        const cie10Codes = Array.isArray(extractedData.diagnosticos)
+          ? extractedData.diagnosticos.map((d: any) => d.codigo_cie10 || d.codigo_cie10_sugerido || '').filter(Boolean)
+          : [];
+
+        // Extract destino alta
+        const destinoAlta = extractedData.destino_alta?.tipo || extractedData.destino_alta?.destino || '';
+
+        // Extract medicamentos
+        const medicamentos = Array.isArray(extractedData.continuidad_asistencial?.medicacion_continuada)
+          ? extractedData.continuidad_asistencial.medicacion_continuada
+          : [];
+
+        // Extract consultas
+        const consultas = Array.isArray(extractedData.continuidad_asistencial?.consultas)
+          ? extractedData.continuidad_asistencial.consultas
+          : [];
+
+        return {
+          document_id: record.document_id || record.id || '',
+          diagnostico: diagnosticos,
+          cie10: cie10Codes,
+          destino_alta: destinoAlta,
+          medicamentos,
+          consultas,
+          source,
+          version: record.metadata?.version || record.version || 'verified',
+        };
+      });
+    } catch (error) {
+      logger.error('Failed to parse ground truth JSON', { error });
       throw error;
     }
   }

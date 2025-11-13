@@ -1,0 +1,172 @@
+# Ground Truth Export CronJob
+#
+# ⚠️  DO NOT DEPLOY THIS YET - FOR DOCUMENTATION PURPOSES ONLY
+#
+# This CronJob configuration is ready for future deployment but should be
+# run manually for now using: npm run export:ground-truth
+#
+# To deploy this CronJob in the future, run:
+#   kubectl apply -f ground-truth-sync-cronjob.yaml
+#
+# Prerequisites before deployment:
+#   1. Create mongodb-uri-secret (see mongodb-uri-secret.yaml.example)
+#   2. Build and push Tirea-AI Docker image with export script
+#   3. Verify S3 IAM permissions are configured
+#   4. Test the export script manually first
+#
+# Schedule: Every Sunday at 2:00 AM UTC
+# Retention: Keep last 3 successful jobs, 1 failed job
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ground-truth-export
+  namespace: langfuse
+  labels:
+    app: ground-truth-export
+    component: data-pipeline
+    managed-by: langfuse-backoffice
+spec:
+  # Schedule: Every Sunday at 2:00 AM UTC
+  # Cron format: minute hour day-of-month month day-of-week
+  schedule: "0 2 * * 0"
+
+  # Timezone (optional, defaults to UTC)
+  # timeZone: "Europe/Madrid"
+
+  # Concurrency policy: Forbid running multiple jobs concurrently
+  concurrencyPolicy: Forbid
+
+  # How many successful/failed jobs to keep
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  # Deadline for starting the job (5 minutes)
+  startingDeadlineSeconds: 300
+
+  jobTemplate:
+    metadata:
+      labels:
+        app: ground-truth-export
+        component: data-pipeline
+    spec:
+      # Job will be marked as failed after 10 minutes
+      activeDeadlineSeconds: 600
+
+      # Number of retries before marking as failed
+      backoffLimit: 2
+
+      template:
+        metadata:
+          labels:
+            app: ground-truth-export
+            component: data-pipeline
+        spec:
+          # Service account with S3 write permissions
+          serviceAccountName: langfuse-metrics-service-sa
+
+          restartPolicy: OnFailure
+
+          containers:
+          - name: export-verified
+            # NOTE: This image needs to be built and pushed before deployment
+            # Build command:
+            #   cd Tirea-AI/server
+            #   docker build -t <your-registry>/tirea-ai-backend:latest .
+            #   docker push <your-registry>/tirea-ai-backend:latest
+            image: tirea-ai-backend:latest
+            imagePullPolicy: Always
+
+            # Run the export script
+            command:
+              - node
+              - dist/scripts/export-verified-documents.js
+
+            env:
+            # MongoDB connection string (from secret)
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-uri-secret
+                  key: uri
+
+            # S3 bucket for ground truth storage
+            - name: GROUND_TRUTH_BUCKET
+              value: "llm-evals-ground-truth-dev"
+
+            # AWS region
+            - name: AWS_REGION
+              value: "eu-west-2"
+
+            # Export last N days of verified documents
+            - name: EXPORT_DAYS
+              value: "7"
+
+            # Node environment
+            - name: NODE_ENV
+              value: "production"
+
+            # Resource limits
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+
+            # Security context
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+
+          # Toleration for spot instances (cost optimization)
+          tolerations:
+          - key: "workload-type"
+            operator: "Equal"
+            value: "batch"
+            effect: "NoSchedule"
+
+---
+# ServiceAccount for the CronJob (if different from metrics service)
+# This ServiceAccount needs IAM role with S3 write permissions
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ground-truth-export-sa
+  namespace: langfuse
+  annotations:
+    # IAM role for S3 access (IRSA - IAM Roles for Service Accounts)
+    eks.amazonaws.com/role-arn: arn:aws:iam::YOUR_ACCOUNT_ID:role/langfuse-ground-truth-export-role
+
+---
+# Example IAM policy for S3 write access (for reference, not deployed by kubectl)
+# This should be created via Terraform or AWS CLI
+#
+# Policy: langfuse-ground-truth-export-policy
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "s3:PutObject",
+#         "s3:PutObjectAcl",
+#         "s3:GetObject"
+#       ],
+#       "Resource": "arn:aws:s3:::llm-evals-ground-truth-dev/datasets/traces/*"
+#     },
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "s3:ListBucket"
+#       ],
+#       "Resource": "arn:aws:s3:::llm-evals-ground-truth-dev"
+#     }
+#   ]
+# }
