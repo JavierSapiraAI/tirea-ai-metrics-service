@@ -30,13 +30,14 @@ export function createApp(traceProcessor: TraceProcessor) {
         isRunning: stats.isRunning,
         pollInterval: stats.pollInterval,
         maxTracesPerPoll: stats.maxTracesPerPoll,
+        processingMode: stats.processingMode,
       },
-      cache: {
+      cache: cacheStats ? {
         size: cacheStats.size,
         lastUpdated: cacheStats.lastUpdated,
         version: cacheStats.version,
         ageMs: cacheStats.ageMs,
-      },
+      } : null,
     };
 
     const statusCode = stats.isRunning ? 200 : 503;
@@ -49,16 +50,17 @@ export function createApp(traceProcessor: TraceProcessor) {
     const cacheStats = stats.cacheStats;
 
     // Service is ready if processor is running
-    // Cache can be empty if no ground truth data is available
+    // Cache can be empty if using judge_scores mode or no ground truth data
     const isReady = stats.isRunning;
 
     const readiness = {
       ready: isReady,
       timestamp: new Date().toISOString(),
+      processingMode: stats.processingMode,
       checks: {
         processorRunning: stats.isRunning,
-        cacheLoaded: cacheStats.size > 0,
-        cacheSize: cacheStats.size,
+        cacheLoaded: cacheStats ? cacheStats.size > 0 : null,
+        cacheSize: cacheStats ? cacheStats.size : null,
       },
     };
 
