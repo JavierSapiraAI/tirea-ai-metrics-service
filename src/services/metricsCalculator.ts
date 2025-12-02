@@ -224,11 +224,14 @@ export class MetricsCalculator {
       // Try to extract structured data
       let extractedData = traceOutput;
 
-      // If output is nested in a result or data field, unwrap it
+      // If output is nested in a result, data, or extraction field, unwrap it
       if (traceOutput.result) {
         extractedData = traceOutput.result;
       } else if (traceOutput.data) {
         extractedData = traceOutput.data;
+      } else if (traceOutput.extraction) {
+        // Handle combined anonymization + extraction output format
+        extractedData = traceOutput.extraction;
       }
 
       // Parse if it's a JSON string
