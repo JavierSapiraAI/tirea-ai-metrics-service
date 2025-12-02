@@ -18,6 +18,7 @@ export class TraceProcessor {
   private isRunning: boolean = false;
   private intervalId?: NodeJS.Timeout;
   private processingMode: ProcessingMode;
+  private isProcessing: boolean = false; // Mutex to prevent overlapping batch runs
 
   constructor() {
     this.groundTruthService = new GroundTruthService();
@@ -58,7 +59,7 @@ export class TraceProcessor {
     }
 
     this.intervalId = setInterval(() => {
-      this.processBatch().catch(error => {
+      this.safeProcessBatch().catch(error => {
         logger.error('Error in processing batch', { error });
       });
     }, this.pollInterval);
@@ -80,6 +81,22 @@ export class TraceProcessor {
 
     await this.langfuseClient.shutdown();
     logger.info('TraceProcessor stopped successfully');
+  }
+
+  /**
+   * Safe wrapper for processBatch that prevents overlapping runs
+   */
+  private async safeProcessBatch(): Promise<void> {
+    if (this.isProcessing) {
+      logger.debug('Batch processing skipped - previous batch still running');
+      return;
+    }
+    this.isProcessing = true;
+    try {
+      await this.processBatch();
+    } finally {
+      this.isProcessing = false;
+    }
   }
 
   private async processBatch(): Promise<void> {
@@ -148,9 +165,23 @@ export class TraceProcessor {
 
   /**
    * Push converted metrics as individual scores to Langfuse
+   * Includes idempotency check to prevent duplicate scores
    */
   private async pushConvertedMetrics(traceId: string, metrics: Record<string, number>): Promise<void> {
+    // Idempotency check: fetch existing API scores for this trace
+    const existingScores = await this.judgeScoreService.getTraceScores(traceId);
+    const existingMetricNames = new Set(
+      existingScores
+        .filter(s => s.source === 'API')
+        .map(s => s.name)
+    );
+
     for (const [name, value] of Object.entries(metrics)) {
+      // Skip if this metric already exists for this trace
+      if (existingMetricNames.has(name)) {
+        logger.debug(`Score ${name} already exists for trace ${traceId}, skipping`);
+        continue;
+      }
       if (METRICS_SCORE_NAMES.includes(name)) {
         await this.createMetricScore(traceId, name, value);
       }

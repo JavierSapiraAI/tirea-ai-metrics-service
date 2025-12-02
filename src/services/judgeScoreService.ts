@@ -172,11 +172,23 @@ export class JudgeScoreService {
   convertJudgeScoresToMetrics(judgeScores: TraceScore[]): Record<string, number> {
     const metricsAccumulator: Record<string, { sum: number; count: number }> = {};
 
-    // Only process EVAL source scores (from LLM judges)
-    const evalScores = judgeScores.filter(s => s.source === 'EVAL');
+    // Only process EVAL source scores (from LLM judges) with non-zero values
+    // Zero scores indicate failed evaluations or missing data and should be excluded from averaging
+    const allEvalScores = judgeScores.filter(s => s.source === 'EVAL');
+    const evalScores = allEvalScores.filter(s => s.value > 0);
+
+    // Debug logging: show input scores
+    logger.debug('Converting judge scores to metrics', {
+      totalScores: judgeScores.length,
+      evalScoresTotal: allEvalScores.length,
+      evalScoresNonZero: evalScores.length,
+      zeroScoresFiltered: allEvalScores.length - evalScores.length,
+      scoreNames: evalScores.map(s => s.name),
+    });
 
     for (const score of evalScores) {
-      const metricNames = JUDGE_TO_METRIC_MAP[score.name];
+      // Use case-insensitive matching for judge score names
+      const metricNames = this.getMetricNamesForJudge(score.name);
       if (metricNames && metricNames.length > 0) {
         for (const metricName of metricNames) {
           if (!metricsAccumulator[metricName]) {
@@ -185,6 +197,9 @@ export class JudgeScoreService {
           metricsAccumulator[metricName].sum += score.value;
           metricsAccumulator[metricName].count += 1;
         }
+      } else {
+        // Log unmapped scores for debugging
+        logger.debug('No mapping found for EVAL score', { name: score.name, value: score.value });
       }
     }
 
@@ -212,6 +227,24 @@ export class JudgeScoreService {
     });
 
     return metrics;
+  }
+
+  /**
+   * Get metric names for a judge score name (case-insensitive matching)
+   */
+  private getMetricNamesForJudge(judgeName: string): string[] | undefined {
+    // Direct lookup first (exact match)
+    if (JUDGE_TO_METRIC_MAP[judgeName]) {
+      return JUDGE_TO_METRIC_MAP[judgeName];
+    }
+    // Case-insensitive fallback
+    const lowerName = judgeName.toLowerCase();
+    for (const [key, value] of Object.entries(JUDGE_TO_METRIC_MAP)) {
+      if (key.toLowerCase() === lowerName) {
+        return value;
+      }
+    }
+    return undefined;
   }
 
   /**
