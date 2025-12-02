@@ -152,12 +152,29 @@ export class LangfuseClient {
 
       // Create a score for each metric
       const scorePromises = [
+        // Diagnostico exact metrics
+        this.createScore(traceId, 'diagnostico_exact_precision', metrics.diagnostico_exact_precision),
+        this.createScore(traceId, 'diagnostico_exact_recall', metrics.diagnostico_exact_recall),
         this.createScore(traceId, 'diagnostico_exact_f1', metrics.diagnostico_exact_f1),
+
+        // Diagnostico soft metrics
+        this.createScore(traceId, 'diagnostico_soft_precision', metrics.diagnostico_soft_precision),
+        this.createScore(traceId, 'diagnostico_soft_recall', metrics.diagnostico_soft_recall),
         this.createScore(traceId, 'diagnostico_soft_f1', metrics.diagnostico_soft_f1),
+
+        // CIE-10 metrics
         this.createScore(traceId, 'cie10_exact_accuracy', metrics.cie10_exact_accuracy),
         this.createScore(traceId, 'cie10_prefix_accuracy', metrics.cie10_prefix_accuracy),
+
+        // Destino metrics
         this.createScore(traceId, 'destino_accuracy', metrics.destino_accuracy),
+
+        // Consultas metrics
+        this.createScore(traceId, 'consultas_precision', metrics.consultas_precision),
+        this.createScore(traceId, 'consultas_recall', metrics.consultas_recall),
         this.createScore(traceId, 'consultas_f1', metrics.consultas_f1),
+
+        // Overall metrics
         this.createScore(traceId, 'overall_average', metrics.overall_average),
       ];
 

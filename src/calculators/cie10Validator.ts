@@ -91,3 +91,114 @@ export function groupByPrefix(codes: string[]): Map<string, string[]> {
 
   return groups;
 }
+
+
+/**
+ * CIE-10 category names (chapters A-Z)
+ */
+export const CIE10_CATEGORIES: Record<string, string> = {
+  'A': 'Infectious diseases',
+  'B': 'Infectious diseases',
+  'C': 'Neoplasms',
+  'D': 'Blood/Neoplasms',
+  'E': 'Endocrine/Metabolic',
+  'F': 'Mental disorders',
+  'G': 'Nervous system',
+  'H': 'Eye/Ear',
+  'I': 'Circulatory system',
+  'J': 'Respiratory system',
+  'K': 'Digestive system',
+  'L': 'Skin diseases',
+  'M': 'Musculoskeletal',
+  'N': 'Genitourinary',
+  'O': 'Pregnancy',
+  'P': 'Perinatal',
+  'Q': 'Congenital',
+  'R': 'Symptoms/Signs',
+  'S': 'Injuries',
+  'T': 'Injuries/Poisoning',
+  'V': 'External causes',
+  'W': 'External causes',
+  'X': 'External causes',
+  'Y': 'External causes',
+  'Z': 'Health factors',
+};
+
+export interface CategoryMetrics {
+  category: string;
+  categoryName: string;
+  exactMatches: number;
+  prefixMatches: number;
+  totalPredicted: number;
+  totalGroundTruth: number;
+  exactAccuracy: number;
+  prefixAccuracy: number;
+}
+
+/**
+ * Validate CIE-10 codes by category (first letter)
+ * Returns metrics grouped by ICD-10 chapter
+ */
+export function validateCIE10ByCategory(
+  predicted: string[],
+  groundTruth: string[]
+): Map<string, CategoryMetrics> {
+  const normalizedPredicted = predicted.map(s => s.toUpperCase().trim());
+  const normalizedGroundTruth = groundTruth.map(s => s.toUpperCase().trim());
+
+  // Group by category (first letter)
+  const predByCategory = new Map<string, string[]>();
+  const truthByCategory = new Map<string, string[]>();
+
+  for (const code of normalizedPredicted) {
+    const cat = code.charAt(0);
+    if (!predByCategory.has(cat)) predByCategory.set(cat, []);
+    predByCategory.get(cat)!.push(code);
+  }
+
+  for (const code of normalizedGroundTruth) {
+    const cat = code.charAt(0);
+    if (!truthByCategory.has(cat)) truthByCategory.set(cat, []);
+    truthByCategory.get(cat)!.push(code);
+  }
+
+  // Get all categories present
+  const allCategories = new Set([...predByCategory.keys(), ...truthByCategory.keys()]);
+  const result = new Map<string, CategoryMetrics>();
+
+  for (const cat of allCategories) {
+    const predCodes = predByCategory.get(cat) || [];
+    const truthCodes = truthByCategory.get(cat) || [];
+
+    // Calculate matches for this category
+    let exactMatches = 0;
+    let prefixMatches = 0;
+
+    for (const pred of predCodes) {
+      if (truthCodes.includes(pred)) {
+        exactMatches++;
+        prefixMatches++;
+      } else {
+        const predPrefix = pred.substring(0, 3);
+        const hasPrefixMatch = truthCodes.some(t => t.substring(0, 3) === predPrefix);
+        if (hasPrefixMatch) prefixMatches++;
+      }
+    }
+
+    const exactAccuracy = predCodes.length > 0 ? exactMatches / predCodes.length : 0;
+    const prefixAccuracy = predCodes.length > 0 ? prefixMatches / predCodes.length : 0;
+
+    result.set(cat, {
+      category: cat,
+      categoryName: CIE10_CATEGORIES[cat] || 'Unknown',
+      exactMatches,
+      prefixMatches,
+      totalPredicted: predCodes.length,
+      totalGroundTruth: truthCodes.length,
+      exactAccuracy: Number(exactAccuracy.toFixed(4)),
+      prefixAccuracy: Number(prefixAccuracy.toFixed(4)),
+    });
+  }
+
+  return result;
+}

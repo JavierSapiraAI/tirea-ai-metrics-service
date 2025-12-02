@@ -14,7 +14,56 @@ export interface AIExtraction {
   consultas: string[];
 }
 
+/**
+ * Extended medical metrics with precision/recall for each field
+ * This provides granular metrics for better analysis
+ */
 export interface MedicalMetrics {
+  // Diagnostico metrics (exact match)
+  diagnostico_exact_precision: number;
+  diagnostico_exact_recall: number;
+  diagnostico_exact_f1: number;
+
+  // Diagnostico metrics (soft/fuzzy match)
+  diagnostico_soft_precision: number;
+  diagnostico_soft_recall: number;
+  diagnostico_soft_f1: number;
+
+  // CIE-10 metrics
+  cie10_exact_accuracy: number;
+  cie10_prefix_accuracy: number;
+  cie10_exact_matches: number;
+  cie10_prefix_matches: number;
+  cie10_total_predictions: number;
+  cie10_total_ground_truth: number;
+
+  // Destino alta metrics
+  destino_accuracy: number;
+
+  // Consultas metrics
+  consultas_precision: number;
+  consultas_recall: number;
+  consultas_f1: number;
+
+  // Overall metrics
+  overall_average: number;
+
+  // Confusion matrix counts for debugging
+  diagnostico_exact_tp: number;
+  diagnostico_exact_fp: number;
+  diagnostico_exact_fn: number;
+  diagnostico_soft_tp: number;
+  diagnostico_soft_fp: number;
+  diagnostico_soft_fn: number;
+  consultas_tp: number;
+  consultas_fp: number;
+  consultas_fn: number;
+}
+
+/**
+ * Legacy metrics interface for backward compatibility
+ */
+export interface LegacyMedicalMetrics {
   diagnostico_exact_f1: number;
   diagnostico_soft_f1: number;
   cie10_exact_accuracy: number;
@@ -76,13 +125,45 @@ export class MetricsCalculator {
       const overallAverage = scores.reduce((sum, score) => sum + score, 0) / scores.length;
 
       const metrics: MedicalMetrics = {
+        // Diagnostico exact metrics
+        diagnostico_exact_precision: diagnosticoExact.precision,
+        diagnostico_exact_recall: diagnosticoExact.recall,
         diagnostico_exact_f1: diagnosticoExact.f1,
+
+        // Diagnostico soft metrics
+        diagnostico_soft_precision: diagnosticoSoft.precision,
+        diagnostico_soft_recall: diagnosticoSoft.recall,
         diagnostico_soft_f1: diagnosticoSoft.f1,
+
+        // CIE-10 metrics
         cie10_exact_accuracy: cie10Validation.exactAccuracy,
         cie10_prefix_accuracy: cie10Validation.prefixAccuracy,
+        cie10_exact_matches: cie10Validation.exactMatches,
+        cie10_prefix_matches: cie10Validation.prefixMatches,
+        cie10_total_predictions: cie10Validation.totalPredictions,
+        cie10_total_ground_truth: cie10Validation.totalGroundTruth,
+
+        // Destino metrics
         destino_accuracy: destinoResult.accuracy,
+
+        // Consultas metrics
+        consultas_precision: consultasF1.precision,
+        consultas_recall: consultasF1.recall,
         consultas_f1: consultasF1.f1,
+
+        // Overall
         overall_average: Number(overallAverage.toFixed(4)),
+
+        // Confusion matrix counts
+        diagnostico_exact_tp: diagnosticoExact.truePositives,
+        diagnostico_exact_fp: diagnosticoExact.falsePositives,
+        diagnostico_exact_fn: diagnosticoExact.falseNegatives,
+        diagnostico_soft_tp: diagnosticoSoft.truePositives,
+        diagnostico_soft_fp: diagnosticoSoft.falsePositives,
+        diagnostico_soft_fn: diagnosticoSoft.falseNegatives,
+        consultas_tp: consultasF1.truePositives,
+        consultas_fp: consultasF1.falsePositives,
+        consultas_fn: consultasF1.falseNegatives,
       };
 
       logger.info(`Metrics calculated successfully for document: ${extraction.document_id}`, {
@@ -110,6 +191,21 @@ export class MetricsCalculator {
       });
       throw error;
     }
+  }
+
+  /**
+   * Convert extended metrics to legacy format for backward compatibility
+   */
+  toLegacyMetrics(metrics: MedicalMetrics): LegacyMedicalMetrics {
+    return {
+      diagnostico_exact_f1: metrics.diagnostico_exact_f1,
+      diagnostico_soft_f1: metrics.diagnostico_soft_f1,
+      cie10_exact_accuracy: metrics.cie10_exact_accuracy,
+      cie10_prefix_accuracy: metrics.cie10_prefix_accuracy,
+      destino_accuracy: metrics.destino_accuracy,
+      consultas_f1: metrics.consultas_f1,
+      overall_average: metrics.overall_average,
+    };
   }
 
   /**

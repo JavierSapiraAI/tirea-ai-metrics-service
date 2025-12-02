@@ -1,11 +1,17 @@
 import express, { Request, Response } from 'express';
 import { TraceProcessor } from './services/traceProcessor';
+import { MetricsCalculator, AIExtraction } from './services/metricsCalculator';
+import { GroundTruthService, GroundTruthDocument } from './services/groundTruthService';
 import { createLogger } from './utils/logger';
 
 const logger = createLogger('App');
 
 export function createApp(traceProcessor: TraceProcessor) {
   const app = express();
+
+  // Initialize services for synchronous calculation endpoint
+  const metricsCalculator = new MetricsCalculator();
+  const groundTruthService = new GroundTruthService();
 
   // Middleware
   app.use(express.json());
@@ -72,6 +78,86 @@ export function createApp(traceProcessor: TraceProcessor) {
   app.get('/stats', (_req: Request, res: Response) => {
     const stats = traceProcessor.getStats();
     res.json(stats);
+  });
+
+  /**
+   * POST /calculate - Synchronous metrics calculation
+   *
+   * Used by Tirea-AI for on-demand quality score calculation.
+   * Returns F1/Accuracy scores compared against ground truth.
+   */
+  app.post('/calculate', async (req: Request, res: Response) => {
+    try {
+      const { document_id, extraction, ground_truth } = req.body;
+
+      // Validate input
+      if (!document_id) {
+        res.status(400).json({ error: 'document_id is required' });
+        return;
+      }
+
+      if (!extraction) {
+        res.status(400).json({ error: 'extraction is required' });
+        return;
+      }
+
+      // Transform extraction to AIExtraction format if needed
+      let aiExtraction: AIExtraction;
+      if (extraction.diagnosticos) {
+        // Tirea format - transform
+        aiExtraction = metricsCalculator.extractDataFromTrace(extraction) || {
+          document_id,
+          diagnostico: [],
+          cie10: [],
+          destino_alta: '',
+          consultas: []
+        };
+        aiExtraction.document_id = document_id;
+      } else {
+        // Already in correct format
+        aiExtraction = extraction as AIExtraction;
+      }
+
+      // Get ground truth: use provided or look up from S3
+      let gt: GroundTruthDocument | null = ground_truth as GroundTruthDocument | null;
+
+      if (!gt) {
+        gt = await groundTruthService.getGroundTruth(document_id);
+      }
+
+      if (!gt) {
+        logger.info(`No ground truth found for document: ${document_id}`);
+        res.status(404).json({
+          error: 'Ground truth not found',
+          document_id
+        });
+        return;
+      }
+
+      // Calculate metrics
+      const metrics = metricsCalculator.calculateMetrics(aiExtraction, gt);
+
+      // Return in CAS-HealthExtract compatible format
+      res.json({
+        document_id,
+        scores: {
+          diagnosticos_score: [metrics.diagnostico_soft_f1],
+          destino_alta_score: metrics.destino_accuracy,
+          consultas_pruebas_pendientes_score: [metrics.consultas_f1],
+          cie10_accuracy: metrics.cie10_prefix_accuracy,
+          overall: metrics.overall_average
+        },
+        raw_metrics: metrics,
+        calculated_at: new Date().toISOString()
+      });
+
+    } catch (error: any) {
+      logger.error('Failed to calculate metrics', { error: error.message });
+      res.status(500).json({
+        error: 'Failed to calculate metrics',
+        message: error.message
+      });
+    }
   });
 
   // 404 handler
