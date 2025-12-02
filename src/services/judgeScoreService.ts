@@ -50,16 +50,24 @@ export const METRICS_SCORE_NAMES = [
  * Mapping from judge scores to metric scores
  * Judge scores are evaluated by LLM judges (EVAL source)
  * Metric scores are what the dashboard expects (API source)
+ *
+ * Note: Some judge scores map to multiple metrics to provide coverage
+ * The convertJudgeScoresToMetrics function handles averaging duplicates
  */
-export const JUDGE_TO_METRIC_MAP: Record<string, string> = {
-  // Document extraction quality judge scores
-  'judge-diagnosticos_accuracy': 'diagnostico_soft_f1',
-  'judge-cie10_accuracy': 'cie10_prefix_accuracy',
-  'judge-destino_accuracy': 'destino_accuracy',
-  'judge-overall_quality': 'overall_average',
-  // Legacy judge scores
-  'Extraction Accuracy': 'overall_average',
-  'Medical Extraction Quality': 'diagnostico_soft_f1',
+export const JUDGE_TO_METRIC_MAP: Record<string, string[]> = {
+  // Current LLM judge scores from evaluators
+  'Extraction Accuracy': ['overall_average'],
+  'Medical Extraction Quality': ['diagnostico_soft_f1', 'diagnostico_exact_f1'],
+  'Field Comparison': ['destino_accuracy', 'consultas_f1', 'cie10_prefix_accuracy'],
+  'Hallucination Detection': [], // Used as quality filter, not direct metric
+
+  // Document extraction quality judge scores (multimodal)
+  'judge-diagnosticos_accuracy': ['diagnostico_soft_f1', 'diagnostico_exact_f1'],
+  'judge-cie10_accuracy': ['cie10_exact_accuracy', 'cie10_prefix_accuracy'],
+  'judge-destino_accuracy': ['destino_accuracy'],
+  'judge-consultas_accuracy': ['consultas_f1'],
+  'judge-overall_quality': ['overall_average'],
+  'judge-completeness': [], // Used as quality indicator
 };
 
 /**
@@ -162,28 +170,46 @@ export class JudgeScoreService {
    * Convert judge scores to metric scores using the mapping
    */
   convertJudgeScoresToMetrics(judgeScores: TraceScore[]): Record<string, number> {
-    const metrics: Record<string, number> = {};
+    const metricsAccumulator: Record<string, { sum: number; count: number }> = {};
 
-    for (const score of judgeScores) {
-      const metricName = JUDGE_TO_METRIC_MAP[score.name];
-      if (metricName) {
-        // If we already have a value for this metric, take the average
-        if (metrics[metricName] !== undefined) {
-          metrics[metricName] = (metrics[metricName] + score.value) / 2;
-        } else {
-          metrics[metricName] = score.value;
+    // Only process EVAL source scores (from LLM judges)
+    const evalScores = judgeScores.filter(s => s.source === 'EVAL');
+
+    for (const score of evalScores) {
+      const metricNames = JUDGE_TO_METRIC_MAP[score.name];
+      if (metricNames && metricNames.length > 0) {
+        for (const metricName of metricNames) {
+          if (!metricsAccumulator[metricName]) {
+            metricsAccumulator[metricName] = { sum: 0, count: 0 };
+          }
+          metricsAccumulator[metricName].sum += score.value;
+          metricsAccumulator[metricName].count += 1;
         }
       }
     }
 
-    // Calculate overall_average if we have enough component metrics
+    // Calculate averages
+    const metrics: Record<string, number> = {};
+    for (const [name, data] of Object.entries(metricsAccumulator)) {
+      if (data.count > 0) {
+        metrics[name] = Number((data.sum / data.count).toFixed(4));
+      }
+    }
+
+    // Calculate overall_average if not already present and we have component metrics
     const componentMetrics = ['diagnostico_soft_f1', 'cie10_prefix_accuracy', 'destino_accuracy', 'consultas_f1'];
     const availableComponents = componentMetrics.filter(m => metrics[m] !== undefined);
 
     if (availableComponents.length > 0 && metrics['overall_average'] === undefined) {
       const sum = availableComponents.reduce((acc, m) => acc + metrics[m], 0);
-      metrics['overall_average'] = sum / availableComponents.length;
+      metrics['overall_average'] = Number((sum / availableComponents.length).toFixed(4));
     }
+
+    logger.debug('Converted judge scores to metrics', {
+      inputScores: evalScores.length,
+      outputMetrics: Object.keys(metrics).length,
+      metrics,
+    });
 
     return metrics;
   }
