@@ -27,9 +27,6 @@ export class TraceProcessor {
     });
   }
 
-  /**
-   * Start the trace processing loop
-   */
   async start(): Promise<void> {
     if (this.isRunning) {
       logger.warn('TraceProcessor is already running');
@@ -39,7 +36,6 @@ export class TraceProcessor {
     this.isRunning = true;
     logger.info('Starting TraceProcessor...');
 
-    // Initial cache load
     try {
       await this.groundTruthService.refreshCache();
       logger.info('Ground truth cache loaded successfully');
@@ -48,26 +44,18 @@ export class TraceProcessor {
       throw error;
     }
 
-    // Start polling loop
     this.intervalId = setInterval(() => {
       this.processBatch().catch(error => {
         logger.error('Error in processing batch', { error });
       });
     }, this.pollInterval);
 
-    // Run first batch immediately
     await this.processBatch();
-
     logger.info('TraceProcessor started successfully');
   }
 
-  /**
-   * Stop the trace processing loop
-   */
   async stop(): Promise<void> {
-    if (!this.isRunning) {
-      return;
-    }
+    if (!this.isRunning) return;
 
     logger.info('Stopping TraceProcessor...');
     this.isRunning = false;
@@ -81,19 +69,14 @@ export class TraceProcessor {
     logger.info('TraceProcessor stopped successfully');
   }
 
-  /**
-   * Process a batch of traces
-   */
   private async processBatch(): Promise<void> {
     try {
       const startTime = Date.now();
       logger.info('Starting batch processing...');
 
-      // Get cache stats
       const cacheStats = this.groundTruthService.getCacheStats();
       logger.debug('Ground truth cache stats', cacheStats);
 
-      // Get unprocessed traces from Langfuse
       const traces = await this.langfuseClient.getUnprocessedTraces(this.maxTracesPerPoll);
 
       if (traces.length === 0) {
@@ -107,7 +90,6 @@ export class TraceProcessor {
       let skipCount = 0;
       let errorCount = 0;
 
-      // Process each trace
       for (const trace of traces) {
         try {
           const processed = await this.processTrace(trace);
@@ -135,12 +117,8 @@ export class TraceProcessor {
     }
   }
 
-  /**
-   * Process a single trace
-   */
   private async processTrace(trace: any): Promise<boolean> {
     try {
-      // Extract document_id and filename from metadata
       const documentId = trace.metadata?.document_id;
       const filename = trace.metadata?.filename;
 
@@ -151,7 +129,6 @@ export class TraceProcessor {
 
       logger.debug(`Processing trace ${trace.id} for document ${documentId} / filename ${filename}`);
 
-      // Try to get ground truth - first by document_id, then by filename
       let groundTruth = documentId
         ? await this.groundTruthService.getGroundTruth(documentId)
         : null;
@@ -159,6 +136,18 @@ export class TraceProcessor {
       if (!groundTruth && filename) {
         logger.debug(`No ground truth found for document_id ${documentId}, trying filename ${filename}`);
         groundTruth = await this.groundTruthService.getGroundTruth(filename);
+
+        if (!groundTruth) {
+          const caseNumbers = this.extractCaseNumbersFromFilename(filename);
+          for (const caseNum of caseNumbers) {
+            logger.debug(`Trying case number pattern: ${caseNum}`);
+            groundTruth = await this.groundTruthService.getGroundTruth(caseNum);
+            if (groundTruth) {
+              logger.debug(`Found ground truth using case number: ${caseNum}`);
+              break;
+            }
+          }
+        }
       }
 
       if (!groundTruth) {
@@ -166,7 +155,6 @@ export class TraceProcessor {
         return false;
       }
 
-      // Extract AI extraction data from trace output
       const extraction = this.metricsCalculator.extractDataFromTrace(trace.output);
 
       if (!extraction) {
@@ -174,21 +162,16 @@ export class TraceProcessor {
         return false;
       }
 
-      // Set document_id if not present
       if (!extraction.document_id) {
         extraction.document_id = documentId;
       }
 
-      // Validate data
       if (!this.metricsCalculator.validateData(extraction, groundTruth)) {
         logger.warn(`Data validation failed for trace ${trace.id}, skipping`);
         return false;
       }
 
-      // Calculate metrics
       const metrics = this.metricsCalculator.calculateMetrics(extraction, groundTruth);
-
-      // Push metrics to Langfuse
       await this.langfuseClient.pushMetrics(trace.id, metrics);
 
       logger.info(`Successfully processed trace ${trace.id}`, {
@@ -203,9 +186,36 @@ export class TraceProcessor {
     }
   }
 
-  /**
-   * Get processing statistics
-   */
+  private extractCaseNumbersFromFilename(filename: string): string[] {
+    const patterns: string[] = [];
+
+    let baseName = filename
+      .replace(/.pdf$/i, '')
+      .replace(/__.*$/, '')
+      .replace(/s*(dragged).*$/i, '')
+      .replace(/s*copy.*$/i, '')
+      .replace(/_/g, ' ')
+      .trim()
+      .replace(/s+/g, '-');
+
+    const fullMatch = baseName.match(/^(d{12}-d{8,9}-d{3})/);
+    if (fullMatch) {
+      patterns.push(fullMatch[1]);
+    }
+
+    const firstNumMatch = baseName.match(/^(d{12})/);
+    if (firstNumMatch) {
+      patterns.push(firstNumMatch[1]);
+    }
+
+    if (baseName && !patterns.includes(baseName)) {
+      patterns.push(baseName);
+    }
+
+    logger.debug('Extracted case number patterns from filename', { filename, patterns });
+    return patterns;
+  }
+
   getStats() {
     return {
       isRunning: this.isRunning,
@@ -215,3 +225,4 @@ export class TraceProcessor {
     };
   }
 }
+
