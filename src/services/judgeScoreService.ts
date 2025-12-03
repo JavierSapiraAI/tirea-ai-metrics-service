@@ -35,15 +35,27 @@ export const JUDGE_SCORE_NAMES = [
 
 /**
  * Metrics score names we calculate and push (API source)
+ * See docs/SCORE-NAMING-CONVENTION.md for naming convention details
+ *
+ * groundtruth-* scores: Computed from ground truth comparison
+ * eval-* scores: Converted from Langfuse EVAL scores
  */
 export const METRICS_SCORE_NAMES = [
-  'diagnostico_exact_f1',
-  'diagnostico_soft_f1',
-  'cie10_exact_accuracy',
-  'cie10_prefix_accuracy',
-  'destino_accuracy',
-  'consultas_f1',
-  'overall_average',
+  // Ground truth comparison scores
+  'groundtruth-diagnostico_exact_f1',
+  'groundtruth-diagnostico_soft_f1',
+  'groundtruth-cie10_exact_accuracy',
+  'groundtruth-cie10_prefix_accuracy',
+  'groundtruth-destino_accuracy',
+  'groundtruth-consultas_f1',
+  'groundtruth-overall_average',
+  // EVAL converted scores
+  'eval-diagnostico_exact_f1',
+  'eval-diagnostico_soft_f1',
+  'eval-cie10_prefix_accuracy',
+  'eval-destino_accuracy',
+  'eval-consultas_f1',
+  'eval-overall_average',
 ];
 
 /**
@@ -54,20 +66,22 @@ export const METRICS_SCORE_NAMES = [
  * Note: Some judge scores map to multiple metrics to provide coverage
  * The convertJudgeScoresToMetrics function handles averaging duplicates
  */
+/**
+ * Mapping from Langfuse EVAL scores to eval-* prefixed metric scores
+ * See docs/SCORE-NAMING-CONVENTION.md for naming convention details
+ *
+ * Langfuse built-in evaluators produce EVAL scores which are then
+ * converted to eval-* prefixed API scores for the dashboard.
+ *
+ * Note: judge-* scores from apply-judges-batch.mjs are pushed directly
+ * and do not need conversion - they already have the correct prefix.
+ */
 export const JUDGE_TO_METRIC_MAP: Record<string, string[]> = {
-  // Current LLM judge scores from evaluators
-  'Extraction Accuracy': ['overall_average'],
-  'Medical Extraction Quality': ['diagnostico_soft_f1', 'diagnostico_exact_f1'],
-  'Field Comparison': ['destino_accuracy', 'consultas_f1', 'cie10_prefix_accuracy'],
+  // Langfuse built-in evaluators (EVAL source) → eval-* prefixed scores
+  'Extraction Accuracy': ['eval-overall_average'],
+  'Medical Extraction Quality': ['eval-diagnostico_soft_f1', 'eval-diagnostico_exact_f1'],
+  'Field Comparison': ['eval-destino_accuracy', 'eval-consultas_f1', 'eval-cie10_prefix_accuracy'],
   'Hallucination Detection': [], // Used as quality filter, not direct metric
-
-  // Document extraction quality judge scores (multimodal)
-  'judge-diagnosticos_accuracy': ['diagnostico_soft_f1', 'diagnostico_exact_f1'],
-  'judge-cie10_accuracy': ['cie10_exact_accuracy', 'cie10_prefix_accuracy'],
-  'judge-destino_accuracy': ['destino_accuracy'],
-  'judge-consultas_accuracy': ['consultas_f1'],
-  'judge-overall_quality': ['overall_average'],
-  'judge-completeness': [], // Used as quality indicator
 };
 
 /**

@@ -152,30 +152,31 @@ export class LangfuseClient {
 
       // Create a score for each metric
       const scorePromises = [
+        // Ground truth comparison metrics (see docs/SCORE-NAMING-CONVENTION.md)
         // Diagnostico exact metrics
-        this.createScore(traceId, 'diagnostico_exact_precision', metrics.diagnostico_exact_precision),
-        this.createScore(traceId, 'diagnostico_exact_recall', metrics.diagnostico_exact_recall),
-        this.createScore(traceId, 'diagnostico_exact_f1', metrics.diagnostico_exact_f1),
+        this.createScore(traceId, 'groundtruth-diagnostico_exact_precision', metrics.diagnostico_exact_precision),
+        this.createScore(traceId, 'groundtruth-diagnostico_exact_recall', metrics.diagnostico_exact_recall),
+        this.createScore(traceId, 'groundtruth-diagnostico_exact_f1', metrics.diagnostico_exact_f1),
 
         // Diagnostico soft metrics
-        this.createScore(traceId, 'diagnostico_soft_precision', metrics.diagnostico_soft_precision),
-        this.createScore(traceId, 'diagnostico_soft_recall', metrics.diagnostico_soft_recall),
-        this.createScore(traceId, 'diagnostico_soft_f1', metrics.diagnostico_soft_f1),
+        this.createScore(traceId, 'groundtruth-diagnostico_soft_precision', metrics.diagnostico_soft_precision),
+        this.createScore(traceId, 'groundtruth-diagnostico_soft_recall', metrics.diagnostico_soft_recall),
+        this.createScore(traceId, 'groundtruth-diagnostico_soft_f1', metrics.diagnostico_soft_f1),
 
         // CIE-10 metrics
-        this.createScore(traceId, 'cie10_exact_accuracy', metrics.cie10_exact_accuracy),
-        this.createScore(traceId, 'cie10_prefix_accuracy', metrics.cie10_prefix_accuracy),
+        this.createScore(traceId, 'groundtruth-cie10_exact_accuracy', metrics.cie10_exact_accuracy),
+        this.createScore(traceId, 'groundtruth-cie10_prefix_accuracy', metrics.cie10_prefix_accuracy),
 
         // Destino metrics
-        this.createScore(traceId, 'destino_accuracy', metrics.destino_accuracy),
+        this.createScore(traceId, 'groundtruth-destino_accuracy', metrics.destino_accuracy),
 
         // Consultas metrics
-        this.createScore(traceId, 'consultas_precision', metrics.consultas_precision),
-        this.createScore(traceId, 'consultas_recall', metrics.consultas_recall),
-        this.createScore(traceId, 'consultas_f1', metrics.consultas_f1),
+        this.createScore(traceId, 'groundtruth-consultas_precision', metrics.consultas_precision),
+        this.createScore(traceId, 'groundtruth-consultas_recall', metrics.consultas_recall),
+        this.createScore(traceId, 'groundtruth-consultas_f1', metrics.consultas_f1),
 
         // Overall metrics
-        this.createScore(traceId, 'overall_average', metrics.overall_average),
+        this.createScore(traceId, 'groundtruth-overall_average', metrics.overall_average),
       ];
 
       await Promise.all(scorePromises);
