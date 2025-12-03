@@ -1,6 +1,6 @@
 {
   "version": "2025.11.12",
-  "updated_at": "2025-11-12T09:48:45.917248Z",
+  "updated_at": "2025-01-13T15:30:00Z",
   "s3_uri": "s3://llm-evals-ground-truth-dev/datasets/traces/versions/2025.11.12/ground-truth.csv",
-  "sha256": "4406273fa754cc5748816863906e788adfb84ef945fc9be5727797b87f87a51c"
+  "notes": "Removed medications column - now tracks 4 fields: diagnostico, cie10, destino_alta, consultas"
 }
