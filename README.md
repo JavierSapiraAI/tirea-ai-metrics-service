@@ -4,12 +4,16 @@ Medical metrics calculation service for Langfuse traces. Calculates quality metr
 
 ## Features
 
-- **Medical Metrics Calculation**: 6 medical-specific quality scores
+- **Medical Metrics Calculation**: 5 medical-specific quality scores
   - Diagnostico F1 (exact and soft matching)
   - CIE-10 Code Accuracy (exact and prefix matching)
   - Destino Alta Accuracy
   - Consultas F1
-  - Overall Average Score
+
+- **Score Naming Convention**: Uses prefixes for different score types
+  - `groundtruth-*`: Scores calculated from ground truth comparison
+  - `eval-*`: Aggregated evaluation metrics
+  - `judge-*`: LLM judge scores from Langfuse
 
 - **Ground Truth Integration**: Loads and caches ground truth from S3
 - **Automatic Processing**: Polls Langfuse API for unprocessed traces
